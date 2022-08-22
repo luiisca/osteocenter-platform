@@ -21,6 +21,7 @@ function useAddAppMutation(_type: App["type"] | null, options?: Parameters<typeo
     const res = await fetch(`/api/integrations/${type}/add` + searchParams);
 
     if (!res.ok) {
+      console.log("USEADDAPPMUTATION", type, searchParams);
       const errorBody = await res.json();
       throw new Error(errorBody.message || "Something went wrong");
     }

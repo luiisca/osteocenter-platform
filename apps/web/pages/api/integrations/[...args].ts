@@ -50,12 +50,14 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
 
   const [appName, apiEndpoint] = args;
   try {
+    console.log("API INTEGRATION ARGS", req.query, appName, apiEndpoint);
     /* Absolute path didn't work */
     const handlerMap = (await import("@calcom/app-store/apps.server.generated")).apiHandlers;
 
     const handlerKey = deriveAppDictKeyFromType(appName, handlerMap);
     const handlers = await handlerMap[handlerKey as keyof typeof handlerMap];
     const handler = handlers[apiEndpoint as keyof typeof handlers] as AppHandler;
+    console.log("API INTEGRATION HANDLER", handler);
     let redirectUrl = "/apps/installed";
     if (typeof handler === "undefined")
       throw new HttpError({ statusCode: 404, message: `API handler not found` });
