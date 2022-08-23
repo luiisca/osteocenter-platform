@@ -1,7 +1,7 @@
 <!-- PROJECT LOGO -->
 <p align="center">
   <a href="https://github.com/calcom/cal.com">
-    <img src="logo.png" alt="Logo">
+    <img src="osteocenter-favicon.png" alt="Logo">
   </a>
 
   <h3 align="center">Osteocenter platform</h3>
