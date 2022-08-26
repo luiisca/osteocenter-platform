@@ -66,6 +66,7 @@ const providers: Provider[] = [
         throw new Error(ErrorCode.UserMissingPassword);
       }
 
+      // compare given password against stored encrypted one using a bcryptjs utility
       const isCorrectPassword = await verifyPassword(credentials.password, user.password);
       if (!isCorrectPassword) {
         throw new Error(ErrorCode.IncorrectPassword);
@@ -100,6 +101,7 @@ const providers: Provider[] = [
         }
       }
 
+      // persisted to the JSON Web Token
       return {
         id: user.id,
         username: user.username,
@@ -178,7 +180,7 @@ if (true) {
         transporter.sendMail({
           from: `${process.env.EMAIL_FROM}` || "Cal.com",
           to: identifier,
-          subject: "Your sign-in link for Cal.com",
+          subject: "Bienvenido a tu cuenta Osteocenter",
           html: emailTemplate({
             base_url: WEBAPP_URL,
             signin_url: url,
@@ -208,6 +210,7 @@ export default NextAuth({
   providers,
   callbacks: {
     async jwt({ token, user, account }) {
+      console.log("JWT CALLBACK");
       const autoMergeIdentities = async () => {
         if (!hostedCal) {
           const existingUser = await prisma.user.findFirst({
@@ -284,6 +287,7 @@ export default NextAuth({
       return token;
     },
     async session({ session, token }) {
+      console.log("SESSION CALLBACK");
       const hasValidLicense = await checkLicense(process.env.CALCOM_LICENSE_KEY || "");
       const calendsoSession: Session = {
         ...session,
@@ -300,8 +304,10 @@ export default NextAuth({
       return calendsoSession;
     },
     async signIn(params) {
+      console.log("SIGNIN CALLBACK");
       const { user, account, profile } = params;
 
+      // maybe because we don't send verification email when using credentials?
       if (account.provider === "email") {
         return true;
       }
@@ -351,6 +357,7 @@ export default NextAuth({
         });
 
         if (existingUser) {
+          console.log("EXISTING USER IN SIGNIN", existingUser);
           // In this case there's an existing user and their email address
           // hasn't changed since they last logged in.
           if (existingUser.email === user.email) {
@@ -446,6 +453,8 @@ export default NextAuth({
       return false;
     },
     async redirect({ url, baseUrl }) {
+      console.log("REDIRECT CALLBACK");
+      console.log("REDIRECT URL + BASEURL", url, baseUrl);
       // Allows relative callback URLs
       if (url.startsWith("/")) return `${baseUrl}${url}`;
       // Allows callback URLs on the same domain

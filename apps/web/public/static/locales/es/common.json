@@ -940,5 +940,6 @@
   "location_workflow": "Ubicación",
   "additional_notes_workflow": "Notas Adicionales",
   "app_upgrade_description": "Para poder usar esta función, necesita actualizarse a una cuenta Pro.",
-  "invalid_number": "Número de teléfono no válido"
+  "invalid_number": "Número de teléfono no válido",
+  "email_already_registered_with_different_provider": "Cuenta ya registrada con un proveedor distinto. Reintenta usando otro proveedor, credenciales (email y contraseña) o facebook"
 }

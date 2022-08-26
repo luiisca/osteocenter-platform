@@ -3,7 +3,7 @@ import { GetServerSidePropsContext } from "next";
 import { getCsrfToken, signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 
 import { getSafeRedirectUrl } from "@calcom/lib/getSafeRedirectUrl";
@@ -52,14 +52,18 @@ export default function Login({
   const [twoFactorRequired, setTwoFactorRequired] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const errorMessages: { [key: string]: string } = {
-    // [ErrorCode.SecondFactorRequired]: t("2fa_enabled_instructions"),
-    [ErrorCode.IncorrectPassword]: `${t("incorrect_password")} ${t("please_try_again")}`,
-    [ErrorCode.UserNotFound]: t("no_account_exists"),
-    [ErrorCode.IncorrectTwoFactorCode]: `${t("incorrect_2fa_code")} ${t("please_try_again")}`,
-    [ErrorCode.InternalServerError]: `${t("something_went_wrong")} ${t("please_try_again_and_contact_us")}`,
-    [ErrorCode.ThirdPartyIdentityProviderEnabled]: t("account_created_with_identity_provider"),
-  };
+  const errorMessages: { [key: string]: string } = useMemo(
+    () => ({
+      // [ErrorCode.SecondFactorRequired]: t("2fa_enabled_instructions"),
+      [ErrorCode.IncorrectPassword]: `${t("incorrect_password")} ${t("please_try_again")}`,
+      [ErrorCode.UserNotFound]: t("no_account_exists"),
+      [ErrorCode.IncorrectTwoFactorCode]: `${t("incorrect_2fa_code")} ${t("please_try_again")}`,
+      [ErrorCode.InternalServerError]: `${t("something_went_wrong")} ${t("please_try_again_and_contact_us")}`,
+      [ErrorCode.ThirdPartyIdentityProviderEnabled]: t("account_created_with_identity_provider"),
+      [ErrorCode.IncorrectProvider]: t("email_already_registered_with_different_provider"),
+    }),
+    [t]
+  );
 
   const telemetry = useTelemetry();
 
@@ -75,6 +79,14 @@ export default function Login({
   const safeCallbackUrl = getSafeRedirectUrl(callbackUrl);
 
   callbackUrl = safeCallbackUrl || "";
+  console.log("LOGIN PAGE CALLBACKURL", router.query?.error);
+  useEffect(() => {
+    if (router.query?.error === "OAuthCallback") {
+      setErrorMessage(errorMessages[ErrorCode.IncorrectProvider]);
+    } else if (router.query?.error) {
+      setErrorMessage(errorMessages[router.query?.error as string] || t("something_went_wrong"));
+    }
+  }, [errorMessages, router.query?.error, t]);
 
   const LoginFooter = (
     <span>
@@ -105,6 +117,7 @@ export default function Login({
         showLogo
         heading={twoFactorRequired ? t("2fa_code") : t("sign_in_account")}
         footerText={twoFactorRequired ? TwoFactorFooter : LoginFooter}>
+        {/**
         <Form
           form={form}
           className="space-y-6"
@@ -145,7 +158,7 @@ export default function Login({
             <div className="relative">
               <div className="absolute right-0 -top-[2px]">
                 <Link href="/auth/forgot-password">
-                  <a tabIndex={-1} className="text-primary-600 text-sm font-medium">
+                  <a tabIndex={-1} className="text-sm font-medium text-primary-600">
                     {t("forgot")}
                   </a>
                 </Link>
@@ -164,11 +177,12 @@ export default function Login({
 
           {errorMessage && <Alert severity="error" title={errorMessage} />}
           <div className="flex space-y-2">
-            <Button className="flex w-full justify-center" type="submit" disabled={isSubmitting}>
+            <Button className="flex justify-center w-full" type="submit" disabled={isSubmitting}>
               {twoFactorRequired ? t("submit") : t("sign_in")}
             </Button>
           </div>
         </Form>
+        **/}
 
         {!twoFactorRequired && (
           <>
@@ -197,6 +211,7 @@ export default function Login({
                 setErrorMessage={setErrorMessage}
               />
             )}
+            {errorMessage && <Alert severity="error" title={errorMessage} />}
           </>
         )}
       </AuthContainer>

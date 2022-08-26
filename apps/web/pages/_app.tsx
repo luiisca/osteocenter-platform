@@ -40,15 +40,7 @@ function MyApp(props: AppProps) {
         <script dangerouslySetInnerHTML={{ __html: `window.CalComPageStatus = '${pageStatus}'` }} />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
       </Head>
-      {getLayout(
-        Component.requiresLicense ? (
-          <LicenseRequired>
-            <Component {...pageProps} err={err} />
-          </LicenseRequired>
-        ) : (
-          <Component {...pageProps} err={err} />
-        )
-      )}
+      {getLayout(<Component {...pageProps} err={err} />)}
     </AppProviders>
   );
 }

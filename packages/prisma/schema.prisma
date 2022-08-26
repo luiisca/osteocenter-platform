@@ -176,7 +176,7 @@ model User {
   /// @zod.custom(imports.userMetadata)
   metadata             Json?
   verified             Boolean?                @default(false)
-  role                 UserPermissionRole      @default(ADMIN)
+  role                 UserPermissionRole      @default(USER)
   disableImpersonation Boolean                 @default(false)
   impersonatedUsers    Impersonations[]        @relation("impersonated_user")
   impersonatedBy       Impersonations[]        @relation("impersonated_by_user")
@@ -250,7 +250,7 @@ model Attendee {
   email     String
   name      String
   timeZone  String
-  locale    String?  @default("en")
+  locale    String?  @default("es")
   booking   Booking? @relation(fields: [bookingId], references: [id])
   bookingId Int?
 }

@@ -146,6 +146,7 @@ export default function Signup({ email }: Props) {
 }
 
 export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
+  console.log("INSIDE SSR SIGNUP");
   const ssr = await ssrInit(ctx);
   const token = asStringOrNull(ctx.query.token);
   if (!token) {
@@ -182,6 +183,7 @@ export const getServerSideProps = async (ctx: GetServerSidePropsContext) => {
   });
 
   if (existingUser) {
+    console.log("SSR SIGNUP this user already exists");
     return {
       redirect: {
         permanent: false,
