@@ -711,6 +711,7 @@
   "account_managed_by_identity_provider": "Tu cuenta es administrada por {{provider}}",
   "account_managed_by_identity_provider_description": "Para cambiar tu correo electrónico, contraseña, habilitar la autenticación de doble factor y más, por favor visita la configuración de tu cuenta de {{provider}}.",
   "signin_with_google": "Iniciar sesión con Google",
+  "signin_with_facebook": "Iniciar sesión con Facebook",
   "signin_with_saml": "Iniciar sesión con SAML",
   "saml_configuration": "Configuración SAML",
   "delete_saml_configuration": "Eliminar configuración SAML",
@@ -941,5 +942,6 @@
   "additional_notes_workflow": "Notas Adicionales",
   "app_upgrade_description": "Para poder usar esta función, necesita actualizarse a una cuenta Pro.",
   "invalid_number": "Número de teléfono no válido",
-  "email_already_registered_with_different_provider": "Cuenta ya registrada con un proveedor distinto. Reintenta usando otro proveedor, credenciales (email y contraseña) o facebook"
+  "email_already_registered_with_different_provider": "Cuenta ya registrada con otro proveedor (Google, Facebook o Enlace Mágico). Por favor reintenta usando el mismo proveedor con el que registraste tu cuenta",
+  "magic_link": "Enlace Mágico"
 }

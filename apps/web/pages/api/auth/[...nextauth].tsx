@@ -5,6 +5,7 @@ import NextAuth, { Session } from "next-auth";
 import { Provider } from "next-auth/providers";
 import CredentialsProvider from "next-auth/providers/credentials";
 import EmailProvider from "next-auth/providers/email";
+import FacebookProvider from "next-auth/providers/facebook";
 import GoogleProvider from "next-auth/providers/google";
 import nodemailer, { TransportOptions } from "nodemailer";
 import { authenticator } from "otplib";
@@ -21,10 +22,15 @@ import prisma from "@calcom/prisma";
 import { ErrorCode, verifyPassword } from "@lib/auth";
 import CalComAdapter from "@lib/auth/next-auth-custom-adapter";
 import { randomString } from "@lib/random";
-import { hostedCal, isSAMLLoginEnabled, samlLoginUrl } from "@lib/saml";
+import { hostedCal } from "@lib/saml";
 import slugify from "@lib/slugify";
 
-import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, IS_GOOGLE_LOGIN_ENABLED } from "@server/lib/constants";
+import {
+  GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET,
+  FACEBOOK_CLIENT_ID,
+  FACEBOOK_CLIENT_SECRET,
+} from "@server/lib/constants";
 
 const transporter = nodemailer.createTransport<TransportOptions>({
   ...(serverConfig.transport as TransportOptions),
@@ -33,132 +39,15 @@ const transporter = nodemailer.createTransport<TransportOptions>({
 const usernameSlug = (username: string) => slugify(username) + "-" + randomString(6).toLowerCase();
 
 const providers: Provider[] = [
-  CredentialsProvider({
-    id: "credentials",
-    name: "Cal.com",
-    type: "credentials",
-    credentials: {
-      email: { label: "Email Address", type: "email", placeholder: "john.doe@example.com" },
-      password: { label: "Password", type: "password", placeholder: "Your super secure password" },
-      totpCode: { label: "Two-factor Code", type: "input", placeholder: "Code from authenticator app" },
-    },
-    async authorize(credentials) {
-      if (!credentials) {
-        console.error(`For some reason credentials are missing`);
-        throw new Error(ErrorCode.InternalServerError);
-      }
-
-      const user = await prisma.user.findUnique({
-        where: {
-          email: credentials.email.toLowerCase(),
-        },
-      });
-
-      if (!user) {
-        throw new Error(ErrorCode.UserNotFound);
-      }
-
-      if (user.identityProvider !== IdentityProvider.CAL) {
-        throw new Error(ErrorCode.ThirdPartyIdentityProviderEnabled);
-      }
-
-      if (!user.password) {
-        throw new Error(ErrorCode.UserMissingPassword);
-      }
-
-      // compare given password against stored encrypted one using a bcryptjs utility
-      const isCorrectPassword = await verifyPassword(credentials.password, user.password);
-      if (!isCorrectPassword) {
-        throw new Error(ErrorCode.IncorrectPassword);
-      }
-
-      if (user.twoFactorEnabled) {
-        if (!credentials.totpCode) {
-          throw new Error(ErrorCode.SecondFactorRequired);
-        }
-
-        if (!user.twoFactorSecret) {
-          console.error(`Two factor is enabled for user ${user.id} but they have no secret`);
-          throw new Error(ErrorCode.InternalServerError);
-        }
-
-        if (!process.env.CALENDSO_ENCRYPTION_KEY) {
-          console.error(`"Missing encryption key; cannot proceed with two factor login."`);
-          throw new Error(ErrorCode.InternalServerError);
-        }
-
-        const secret = symmetricDecrypt(user.twoFactorSecret, process.env.CALENDSO_ENCRYPTION_KEY);
-        if (secret.length !== 32) {
-          console.error(
-            `Two factor secret decryption failed. Expected key with length 32 but got ${secret.length}`
-          );
-          throw new Error(ErrorCode.InternalServerError);
-        }
-
-        const isValidToken = authenticator.check(credentials.totpCode, secret);
-        if (!isValidToken) {
-          throw new Error(ErrorCode.IncorrectTwoFactorCode);
-        }
-      }
-
-      // persisted to the JSON Web Token
-      return {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-      };
-    },
+  FacebookProvider({
+    clientId: FACEBOOK_CLIENT_ID,
+    clientSecret: FACEBOOK_CLIENT_SECRET,
   }),
-  ImpersonationProvider,
+  GoogleProvider({
+    clientId: GOOGLE_CLIENT_ID,
+    clientSecret: GOOGLE_CLIENT_SECRET,
+  }),
 ];
-
-if (IS_GOOGLE_LOGIN_ENABLED) {
-  providers.push(
-    GoogleProvider({
-      clientId: GOOGLE_CLIENT_ID,
-      clientSecret: GOOGLE_CLIENT_SECRET,
-    })
-  );
-}
-
-if (isSAMLLoginEnabled) {
-  providers.push({
-    id: "saml",
-    name: "BoxyHQ",
-    type: "oauth",
-    version: "2.0",
-    checks: ["pkce", "state"],
-    authorization: {
-      url: `${samlLoginUrl}/api/auth/saml/authorize`,
-      params: {
-        scope: "",
-        response_type: "code",
-        provider: "saml",
-      },
-    },
-    token: {
-      url: `${samlLoginUrl}/api/auth/saml/token`,
-      params: { grant_type: "authorization_code" },
-    },
-    userinfo: `${samlLoginUrl}/api/auth/saml/userinfo`,
-    profile: (profile) => {
-      return {
-        id: profile.id || "",
-        firstName: profile.firstName || "",
-        lastName: profile.lastName || "",
-        email: profile.email || "",
-        name: `${profile.firstName || ""} ${profile.lastName || ""}`.trim(),
-        email_verified: true,
-      };
-    },
-    options: {
-      clientId: "dummy",
-      clientSecret: "dummy",
-    },
-  });
-}
 
 if (true) {
   const emailsDir = path.resolve(process.cwd(), "..", "..", "packages/emails", "templates");
@@ -167,7 +56,7 @@ if (true) {
       type: "email",
       maxAge: 10 * 60 * 60, // Magic links are valid for 10 min only
       // Here we setup the sendVerificationRequest that calls the email template with the identifier (email) and token to verify.
-      sendVerificationRequest: ({ identifier, url }) => {
+      async sendVerificationRequest({ identifier, url }) {
         const originalUrl = new URL(url);
         const webappUrl = new URL(WEBAPP_URL);
         if (originalUrl.origin !== webappUrl.origin) {
@@ -177,8 +66,8 @@ if (true) {
           encoding: "utf8",
         });
         const emailTemplate = Handlebars.compile(emailFile);
-        transporter.sendMail({
-          from: `${process.env.EMAIL_FROM}` || "Cal.com",
+        const result = await transporter.sendMail({
+          from: `${process.env.EMAIL_FROM}` || "Clínica Osteocenter",
           to: identifier,
           subject: "Bienvenido a tu cuenta Osteocenter",
           html: emailTemplate({
@@ -187,6 +76,11 @@ if (true) {
             email: identifier,
           }),
         });
+        console.log("MAGIC LINK RESULT", result);
+        const failed = result.rejected.concat(result.pending).filter(Boolean);
+        if (failed.length) {
+          new Error(`Email(s) (${failed.join(", ")}) no se pudo enviar`);
+        }
       },
     })
   );
@@ -211,52 +105,36 @@ export default NextAuth({
   callbacks: {
     async jwt({ token, user, account }) {
       console.log("JWT CALLBACK");
+      console.log("JWT token", token);
+      console.log("JWT user", user);
+      console.log("JWT account", account);
       const autoMergeIdentities = async () => {
-        if (!hostedCal) {
-          const existingUser = await prisma.user.findFirst({
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            where: { email: token.email! },
-          });
+        const existingUser = await prisma.user.findFirst({
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+          where: { email: token.email! },
+        });
 
-          if (!existingUser) {
-            return token;
-          }
-
-          return {
-            id: existingUser.id,
-            username: existingUser.username,
-            name: existingUser.name,
-            email: existingUser.email,
-            role: existingUser.role,
-            impersonatedByUID: token?.impersonatedByUID as number,
-          };
+        if (!existingUser) {
+          return token;
         }
 
-        return token;
+        return {
+          id: existingUser.id,
+          username: existingUser.username,
+          name: existingUser.name,
+          email: existingUser.email,
+          role: existingUser.role,
+        };
       };
 
       if (!user) {
         return await autoMergeIdentities();
       }
 
-      if (account && account.type === "credentials") {
-        return {
-          id: user.id,
-          name: user.name,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-          impersonatedByUID: user?.impersonatedByUID as number,
-        };
-      }
-
       // The arguments above are from the provider so we need to look up the
       // user based on those values in order to construct a JWT.
       if (account && account.type === "oauth" && account.provider && account.providerAccountId) {
-        let idP: IdentityProvider = IdentityProvider.GOOGLE;
-        if (account.provider === "saml") {
-          idP = IdentityProvider.SAML;
-        }
+        const idP: IdentityProvider = IdentityProvider.GOOGLE;
         const existingUser = await prisma.user.findFirst({
           where: {
             AND: [
@@ -280,7 +158,6 @@ export default NextAuth({
           username: existingUser.username,
           email: existingUser.email,
           role: existingUser.role,
-          impersonatedByUID: token.impersonatedByUID as number,
         };
       }
 
@@ -306,14 +183,12 @@ export default NextAuth({
     async signIn(params) {
       console.log("SIGNIN CALLBACK");
       const { user, account, profile } = params;
+      console.log("SIGNIN account", account);
+      console.log("SIGNIN user", user);
+      console.log("SIGNIN profile", profile);
 
       // maybe because we don't send verification email when using credentials?
       if (account.provider === "email") {
-        return true;
-      }
-      // In this case we've already verified the credentials in the authorize
-      // callback so we can sign the user in.
-      if (account.type === "credentials") {
         return true;
       }
 
@@ -331,17 +206,18 @@ export default NextAuth({
 
       if (account.provider) {
         let idP: IdentityProvider = IdentityProvider.GOOGLE;
-        if (account.provider === "saml") {
-          idP = IdentityProvider.SAML;
-        }
         user.email_verified = user.email_verified || profile.email_verified;
+        if (account.provider === "facebook") {
+          idP = IdentityProvider.FACEBOOK;
+        }
 
-        if (!user.email_verified) {
+        if (idP === "GOOGLE" && !user.email_verified) {
           return "/auth/error?error=unverified-email";
         }
         // Only google oauth on this path
         const provider = account.provider.toUpperCase() as IdentityProvider;
 
+        console.log("SIGNIN CALLBACK BEFORE EXISTING USER");
         const existingUser = await prisma.user.findFirst({
           include: {
             accounts: {
@@ -356,6 +232,7 @@ export default NextAuth({
           },
         });
 
+        console.log("SIGNIN CALLBACK AFTER EXISTING USER", existingUser);
         if (existingUser) {
           console.log("EXISTING USER IN SIGNIN", existingUser);
           // In this case there's an existing user and their email address
@@ -425,13 +302,11 @@ export default NextAuth({
             return true;
           }
 
-          if (existingUserWithEmail.identityProvider === IdentityProvider.CAL) {
-            return "/auth/error?error=use-password-login";
-          }
-
+          console.log("SIGNIN CALLBACK, there is an existing user with this email", existingUserWithEmail);
           return "/auth/error?error=use-identity-login";
         }
 
+        console.log("SIGNIN CALLBACK: A NEW USER IS ABOUT TO BE CREATED ");
         const newUser = await prisma.user.create({
           data: {
             // Slugify the incoming name and append a few random characters to
@@ -444,6 +319,7 @@ export default NextAuth({
             identityProviderId: user.id as string,
           },
         });
+        console.log("SIGNIN CALLBACK: New user created", newUser);
         const linkAccountNewUserData = { ...account, userId: newUser.id };
         await calcomAdapter.linkAccount(linkAccountNewUserData);
 

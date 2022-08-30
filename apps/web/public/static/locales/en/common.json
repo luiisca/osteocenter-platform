@@ -725,6 +725,7 @@
   "account_managed_by_identity_provider": "Your account is managed by {{provider}}",
   "account_managed_by_identity_provider_description": "To change your email, password, enable two-factor authentication and more, please visit your {{provider}} account settings.",
   "signin_with_google": "Sign in with Google",
+  "signin_with_facebook": "Sign in with Facebook",
   "signin_with_saml": "Sign in with SAML",
   "saml_configuration": "SAML configuration",
   "delete_saml_configuration": "Delete SAML configuration",
@@ -1037,5 +1038,6 @@
   "missing_connected_calendar": "No calendar connected",
   "download_desktop_app": "Download desktop app",
   "set_ping_link": "Set Ping link",
-  "email_already_registered_with_different_provider": "Account already registered with another provider. Please try again with the correct provider."
+  "email_already_registered_with_different_provider": "Account already registered with another provider (Google, Facebook or Magic Link). Please try again using the one you registered your account with.",
+  "magic_link": "Magic Link"
 }

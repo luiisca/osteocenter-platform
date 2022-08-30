@@ -30,7 +30,6 @@ enum PeriodType {
   RANGE     @map("range")
 }
 
-// SCHEDULING APP
 model EventType {
   id                      Int                     @id @default(autoincrement())
   /// @zod.nonempty()
@@ -104,9 +103,9 @@ enum UserPlan {
 }
 
 enum IdentityProvider {
-  CAL
+  MAGIC
   GOOGLE
-  SAML
+  FACEBOOK
 }
 
 model DestinationCalendar {
@@ -137,14 +136,14 @@ model User {
   password             String?
   bio                  String?
   avatar               String?
-  timeZone             String                  @default("Europe/London")
-  weekStart            String                  @default("Sunday")
+  timeZone             String                  @default("America/Lima")
+  weekStart            String                  @default("Monday")
   // DEPRECATED - TO BE REMOVED
   startTime            Int                     @default(0)
   endTime              Int                     @default(1440)
   // </DEPRECATED>
   bufferTime           Int                     @default(0)
-  hideBranding         Boolean                 @default(false)
+  hideBranding         Boolean                 @default(true)
   theme                String?
   createdDate          DateTime                @default(now()) @map(name: "created")
   trialEndsAt          DateTime?
@@ -160,11 +159,11 @@ model User {
   timeFormat           Int?                    @default(12)
   twoFactorSecret      String?
   twoFactorEnabled     Boolean                 @default(false)
-  identityProvider     IdentityProvider        @default(CAL)
+  identityProvider     IdentityProvider        @default(GOOGLE)
   identityProviderId   String?
   availability         Availability[]
   invitedTo            Int?
-  plan                 UserPlan                @default(TRIAL)
+  plan                 UserPlan                @default(PRO)
   webhooks             Webhook[]
   brandColor           String                  @default("#292929")
   darkBrandColor       String                  @default("#fafafa")
@@ -187,6 +186,10 @@ model User {
   ownedEventTypes      EventType[]             @relation("owner")
   workflows            Workflow[]
   routingForms         App_RoutingForms_Form[] @relation("routing-form")
+  patient              Patient?                @relation(fields: [patientDNI], references: [DNI])
+  patientDNI           Int?                    @unique
+  doctor               Doctor?                 @relation(fields: [doctorId], references: [id])
+  doctorId             Int?                    @unique
 
   @@map(name: "users")
 }
@@ -275,12 +278,12 @@ model Booking {
   customInputs          Json?
   startTime             DateTime
   endTime               DateTime
-  attendees             Attendee[]
+  attendees             Attendee[] // should connect or create Profile
   location              String?
   createdAt             DateTime             @default(now())
   updatedAt             DateTime?
   status                BookingStatus        @default(ACCEPTED)
-  paid                  Boolean              @default(false)
+  paid                  Boolean              @default(true)
   payment               Payment[]
   destinationCalendar   DestinationCalendar? @relation(fields: [destinationCalendarId], references: [id])
   destinationCalendarId Int?
@@ -344,14 +347,6 @@ model EventTypeCustomInput {
   type        EventTypeCustomInputType
   required    Boolean
   placeholder String                   @default("")
-}
-
-model ResetPasswordRequest {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  email     String
-  expires   DateTime
 }
 
 enum ReminderType {
@@ -442,7 +437,6 @@ model HashedLink {
 model Account {
   id                String  @id @default(cuid())
   userId            Int
-  patientId         String
   type              String
   provider          String
   providerAccountId String
@@ -454,8 +448,7 @@ model Account {
   id_token          String? @db.Text
   session_state     String?
 
-  user    User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  patient Patient? @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -467,7 +460,6 @@ model Session {
   patientId    String
   expires      DateTime
   user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  patient      Patient? @relation(fields: [patientId], references: [id], onDelete: Cascade)
 }
 
 enum AppCategories {
@@ -603,14 +595,13 @@ enum WorkflowMethods {
   SMS
 }
 
-// PLATFORM
 model Patient {
-  id            String             @id @default(cuid())
-  name          String?
-  email         String?            @unique
-  emailVerified DateTime?
-  image         String?
-  accounts      Account[]
-  sessions      Session[]
-  role          UserPermissionRole @default(USER)
+  id   Int   @id @default(autoincrement())
+  DNI  Int   @unique
+  user User?
+}
+
+model Doctor {
+  id   Int   @id @default(autoincrement())
+  user User?
 }

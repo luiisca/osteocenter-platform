@@ -30,27 +30,17 @@ import { ssrInit } from "@server/lib/ssr";
 
 interface LoginValues {
   email: string;
-  password: string;
-  totpCode: string;
-  csrfToken: string;
 }
 
-export default function Login({
-  csrfToken,
-  isGoogleLoginEnabled,
-  isSAMLLoginEnabled,
-  hostedCal,
-  samlTenantID,
-  samlProductID,
-}: inferSSRProps<typeof getServerSideProps>) {
+export default function Login() {
   const { t } = useLocale();
   const router = useRouter();
   const form = useForm<LoginValues>();
   const { formState } = form;
   const { isSubmitting } = formState;
 
-  const [twoFactorRequired, setTwoFactorRequired] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [oAuthError, setOAuthError] = useState<boolean>(false);
 
   const errorMessages: { [key: string]: string } = useMemo(
     () => ({
@@ -81,139 +71,82 @@ export default function Login({
   callbackUrl = safeCallbackUrl || "";
   console.log("LOGIN PAGE CALLBACKURL", router.query?.error);
   useEffect(() => {
-    if (router.query?.error === "OAuthCallback") {
+    if (router.query?.error === "OAuthCallback" || router.query?.error === "OAuthAccountNotLinked") {
+      setOAuthError(true);
       setErrorMessage(errorMessages[ErrorCode.IncorrectProvider]);
     } else if (router.query?.error) {
+      setOAuthError(true);
       setErrorMessage(errorMessages[router.query?.error as string] || t("something_went_wrong"));
     }
   }, [errorMessages, router.query?.error, t]);
 
-  const LoginFooter = (
-    <span>
-      {t("dont_have_an_account")}{" "}
-      <a href={`${WEBSITE_URL}/signup`} className="font-medium text-neutral-900">
-        {t("create_an_account")}
-      </a>
-    </span>
-  );
-
-  const TwoFactorFooter = (
-    <Button
-      onClick={() => {
-        setTwoFactorRequired(false);
-        form.setValue("totpCode", "");
-      }}
-      StartIcon={Icon.FiArrowLeft}
-      color="minimal">
-      {t("go_back")}
-    </Button>
-  );
-
   return (
     <>
-      <AuthContainer
-        title={t("login")}
-        description={t("login")}
-        showLogo
-        heading={twoFactorRequired ? t("2fa_code") : t("sign_in_account")}
-        footerText={twoFactorRequired ? TwoFactorFooter : LoginFooter}>
-        {/**
+      <AuthContainer title={t("login")} description={t("login")} showLogo heading={t("sign_in_account")}>
         <Form
           form={form}
           className="space-y-6"
           handleSubmit={async (values) => {
             setErrorMessage(null);
             telemetry.event(telemetryEventTypes.login, collectPageParameters());
-            const res = await signIn<"credentials">("credentials", {
-              ...values,
-              callbackUrl,
+            console.log("FORM VALUES", values);
+            const res = await signIn<"email">("email", {
               redirect: false,
+              email: values.email,
             });
+            console.log("EMAIL PROVIDER", res, values);
             if (!res) setErrorMessage(errorMessages[ErrorCode.InternalServerError]);
             // we're logged in! let's do a hard refresh to the desired url
-            else if (!res.error) router.push(callbackUrl);
-            // reveal two factor input if required
-            else if (res.error === ErrorCode.SecondFactorRequired) setTwoFactorRequired(true);
-            // fallback if error not found
+            else if (!res.error) router.push(res.url || "");
             else setErrorMessage(errorMessages[res.error] || t("something_went_wrong"));
           }}
           data-testid="login-form">
-          <div>
-            <input
-              defaultValue={csrfToken || undefined}
-              type="hidden"
-              hidden
-              {...form.register("csrfToken")}
-            />
-          </div>
-          <div className={classNames("space-y-6", { hidden: twoFactorRequired })}>
-            <EmailField
-              id="email"
-              label={t("email_address")}
-              defaultValue={router.query.email as string}
-              placeholder="john.doe@example.com"
-              required
-              {...form.register("email")}
-            />
-            <div className="relative">
-              <div className="absolute right-0 -top-[2px]">
-                <Link href="/auth/forgot-password">
-                  <a tabIndex={-1} className="text-sm font-medium text-primary-600">
-                    {t("forgot")}
-                  </a>
-                </Link>
-              </div>
-              <PasswordField
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                {...form.register("password")}
-              />
-            </div>
-          </div>
+          <EmailField
+            id="email"
+            label={t("magic_link")}
+            defaultValue={router.query.email || ""}
+            placeholder="john.doe@example.com"
+            required
+            registerValue="email"
+          />
 
-          {twoFactorRequired && <TwoFactor />}
-
-          {errorMessage && <Alert severity="error" title={errorMessage} />}
+          {errorMessage && !oAuthError && <Alert severity="error" title={errorMessage} />}
           <div className="flex space-y-2">
-            <Button className="flex justify-center w-full" type="submit" disabled={isSubmitting}>
-              {twoFactorRequired ? t("submit") : t("sign_in")}
+            <Button className="flex w-full justify-center" type="submit" disabled={isSubmitting}>
+              {t("sign_in")}
             </Button>
           </div>
         </Form>
-        **/}
 
-        {!twoFactorRequired && (
-          <>
-            {isGoogleLoginEnabled && (
-              <div className="mt-5">
-                <Button
-                  color="secondary"
-                  className="flex w-full justify-center"
-                  data-testid="google"
-                  onClick={async (e) => {
-                    e.preventDefault();
-                    // track Google logins. Without personal data/payload
-                    telemetry.event(telemetryEventTypes.googleLogin, collectPageParameters());
-                    await signIn("google");
-                  }}>
-                  {t("signin_with_google")}
-                </Button>
-              </div>
-            )}
-            {isSAMLLoginEnabled && (
-              <SAMLLogin
-                email={form.getValues("email")}
-                samlTenantID={samlTenantID}
-                samlProductID={samlProductID}
-                hostedCal={hostedCal}
-                setErrorMessage={setErrorMessage}
-              />
-            )}
-            {errorMessage && <Alert severity="error" title={errorMessage} />}
-          </>
-        )}
+        <>
+          <div className="mt-5">
+            <Button
+              color="secondary"
+              className="flex w-full justify-center"
+              data-testid="google"
+              onClick={async (e) => {
+                e.preventDefault();
+                // track Google logins. Without personal data/payload
+                telemetry.event(telemetryEventTypes.googleLogin, collectPageParameters());
+                await signIn("google");
+              }}>
+              {t("signin_with_google")}
+            </Button>
+          </div>
+          <div className="my-5">
+            <Button
+              color="secondary"
+              className="flex w-full justify-center"
+              data-testid="facebook"
+              onClick={async (e) => {
+                e.preventDefault();
+                await signIn("facebook");
+              }}>
+              {t("signin_with_facebook")}
+            </Button>
+          </div>
+          {oAuthError && <Alert severity="error" title={errorMessage} />}
+        </>
       </AuthContainer>
       <AddToHomescreen />
     </>
@@ -234,26 +167,10 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
     };
   }
 
-  const userCount = await prisma.user.count();
-  if (userCount === 0) {
-    // Proceed to new onboarding to create first admin user
-    return {
-      redirect: {
-        destination: "/auth/setup",
-        permanent: false,
-      },
-    };
-  }
-
   return {
     props: {
-      csrfToken: await getCsrfToken(context),
+      // SSR i18n translations to avoid visual flickering
       trpcState: ssr.dehydrate(),
-      isGoogleLoginEnabled: IS_GOOGLE_LOGIN_ENABLED,
-      isSAMLLoginEnabled,
-      hostedCal,
-      samlTenantID,
-      samlProductID,
     },
   };
 }

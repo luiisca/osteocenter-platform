@@ -12,10 +12,14 @@ import { Alert } from "../Alert";
 type InputProps = Omit<JSX.IntrinsicElements["input"], "name"> & { name: string };
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(props, ref) {
+  const methods = useFormContext();
+  const { registerValue, ...passThrough } = props;
+
   return (
     <input
-      {...props}
+      {...passThrough}
       ref={ref}
+      {...methods?.register(registerValue)}
       className={classNames(
         "mt-1 block w-full rounded-sm border border-gray-300 py-2 px-3 shadow-sm focus:border-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-800 sm:text-sm",
         props.className
@@ -44,6 +48,7 @@ type InputFieldProps = {
   label?: ReactNode;
   hint?: ReactNode;
   addOnLeading?: ReactNode;
+  registerValue?: string;
 } & React.ComponentProps<typeof Input> & {
     labelProps?: React.ComponentProps<typeof Label>;
   };
@@ -53,10 +58,10 @@ const InputField = forwardRef<HTMLInputElement, InputFieldProps>(function InputF
   const { t } = useLocale();
   const methods = useFormContext();
   const {
-    label = t(props.name),
+    label = t(props.registerValue),
     labelProps,
-    placeholder = t(props.name + "_placeholder") !== props.name + "_placeholder"
-      ? t(props.name + "_placeholder")
+    placeholder = t(props.registerValue + "_placeholder") !== props.registerValue + "_placeholder"
+      ? t(props.registerValue + "_placeholder")
       : "",
     className,
     addOnLeading,
@@ -65,7 +70,7 @@ const InputField = forwardRef<HTMLInputElement, InputFieldProps>(function InputF
   } = props;
   return (
     <div>
-      {!!props.name && (
+      {!!props.registerValue && (
         <Label htmlFor={id} {...labelProps}>
           {label}
         </Label>
