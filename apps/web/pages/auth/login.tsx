@@ -1,7 +1,5 @@
-import classNames from "classnames";
 import { GetServerSidePropsContext } from "next";
-import { getCsrfToken, signIn } from "next-auth/react";
-import Link from "next/link";
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/router";
 import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
@@ -11,21 +9,14 @@ import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { collectPageParameters, telemetryEventTypes, useTelemetry } from "@calcom/lib/telemetry";
 import { Alert } from "@calcom/ui/Alert";
 import Button from "@calcom/ui/Button";
-import { Icon } from "@calcom/ui/Icon";
-import { EmailField, Form, PasswordField } from "@calcom/ui/form/fields";
-import prisma from "@calcom/web/lib/prisma";
+import { EmailField, Form } from "@calcom/ui/form/fields";
 
-import { ErrorCode, getSession } from "@lib/auth";
-import { WEBAPP_URL, WEBSITE_URL } from "@lib/config/constants";
-import { hostedCal, isSAMLLoginEnabled, samlProductID, samlTenantID } from "@lib/saml";
-import { inferSSRProps } from "@lib/types/inferSSRProps";
+import { ErrorCode, getSessionServerSide } from "@lib/auth";
+import { WEBAPP_URL } from "@lib/config/constants";
 
 import AddToHomescreen from "@components/AddToHomescreen";
-import SAMLLogin from "@components/auth/SAMLLogin";
-import TwoFactor from "@components/auth/TwoFactor";
 import AuthContainer from "@components/ui/AuthContainer";
 
-import { IS_GOOGLE_LOGIN_ENABLED } from "@server/lib/constants";
 import { ssrInit } from "@server/lib/ssr";
 
 interface LoginValues {
@@ -140,6 +131,7 @@ export default function Login() {
           <EmailField
             id="email"
             label={t("magic_link")}
+            name="email"
             defaultValue={router.query.email || ""}
             placeholder="john.doe@example.com"
             required
@@ -161,8 +153,7 @@ export default function Login() {
 }
 
 export async function getServerSideProps(context: GetServerSidePropsContext) {
-  const { req } = context;
-  const session = await getSession({ req });
+  const session = await getSessionServerSide(context);
   const ssr = await ssrInit(context);
 
   if (session) {

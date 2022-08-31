@@ -228,7 +228,6 @@ const PlainForm = <T extends FieldValues>(props: FormProps<T>, ref: Ref<HTMLForm
               ? React.createElement(child.type, {
                   ...{
                     ...child.props,
-                    register: form.register,
                     key: child.props.name,
                   },
                 })

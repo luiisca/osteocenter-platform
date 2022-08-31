@@ -39,7 +39,7 @@ const bodySchema = z.object({
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { uid, allRemainingBookings, cancellationReason } = bodySchema.parse(req.body);
-  const session = await getSession({ req });
+  const session = await getSession({ req, res });
 
   const bookingToDelete = await prisma.booking.findUnique({
     where: {

@@ -1,9 +1,12 @@
 import { compare, hash } from "bcryptjs";
 import type { NextApiRequest } from "next";
 import type { Session } from "next-auth";
-import { getSession as getSessionInner, GetSessionParams } from "next-auth/react";
+import { unstable_getServerSession as getServerSession } from "next-auth";
+import { GetSessionParams } from "next-auth/react";
 
 import { HttpError } from "@calcom/lib/http-error";
+
+import { authOptions } from "../../apps/web/pages/api/auth/[...nextauth]";
 
 export async function hashPassword(password: string) {
   const hashedPassword = await hash(password, 12);
@@ -16,7 +19,7 @@ export async function verifyPassword(password: string, hashedPassword: string) {
 }
 
 export async function getSession(options: GetSessionParams): Promise<Session | null> {
-  const session = await getSessionInner(options);
+  const session = await getServerSession(options.req, options.res, authOptions);
 
   // that these are equal are ensured in `[...nextauth]`'s callback
   return session as Session | null;
