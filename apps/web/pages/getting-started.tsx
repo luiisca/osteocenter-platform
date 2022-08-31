@@ -277,7 +277,7 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
                   autoComplete="given-name"
                   placeholder={t("first_name")}
                   {...register("firstName")}
-                  className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-sm focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
+                  className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
                 />
                 {errors.firstName && (
                   <p className="text-red-400 sm:text-sm">{t(errors.firstName.message as string)}</p>
@@ -292,7 +292,7 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
                   autoComplete="family-name"
                   placeholder={t("last_name")}
                   {...register("lastName")}
-                  className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-sm focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
+                  className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
                 />
                 {errors.lastName && (
                   <p className="text-red-400 sm:text-sm">{t(errors.lastName.message as string)}</p>
@@ -308,7 +308,7 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
                   id="phoneNumber"
                   autoComplete="tel"
                   placeholder="+51931109731"
-                  className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-sm focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
+                  className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
                 />
                 {errors.phoneNumber && (
                   <p className="text-red-400 sm:text-sm">{t(errors.phoneNumber.message as string)}</p>
@@ -323,7 +323,7 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
                   type="tel"
                   id="DNI"
                   placeholder="76097512"
-                  className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-sm focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
+                  className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
                 />
                 {errors.DNI && <p className="text-red-400 sm:text-sm">{t(errors.DNI.message as string)}</p>}
               </fieldset>
@@ -342,7 +342,7 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
                   id="timeZone"
                   value={selectedTimeZone}
                   onChange={({ value }) => setSelectedTimeZone(value)}
-                  className="block w-full mt-1 border-gray-300 rounded-md focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 />
               </fieldset>
             </section>
@@ -395,7 +395,7 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
       description: t("set_availability_instructions"),
       Component: (
         <Form<ScheduleFormValues>
-          className="max-w-lg mx-auto text-black bg-white dark:bg-opacity-5 dark:text-white"
+          className="mx-auto max-w-lg bg-white text-black dark:bg-opacity-5 dark:text-white"
           form={availabilityForm}
           handleSubmit={async (values) => {
             try {
@@ -414,7 +414,7 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
           }}>
           <section>
             <Schedule name="schedule" />
-            <footer className="flex flex-col py-6 space-y-6 sm:mx-auto sm:w-full">
+            <footer className="flex flex-col space-y-6 py-6 sm:mx-auto sm:w-full">
               <Button className="justify-center" EndIcon={Icon.FiArrowRight} type="submit">
                 {t("continue")}
               </Button>
@@ -438,25 +438,25 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
   }
 
   return (
-    <div className="min-h-screen bg-brand" data-testid="onboarding">
+    <div className="bg-brand min-h-screen" data-testid="onboarding">
       <Head>
         <title>Osteocenter - {t("getting_started")}</title>
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
       {isSubmitting && (
-        <div className="fixed z-10 flex flex-col items-center content-center justify-center w-full h-full bg-white bg-opacity-25">
+        <div className="fixed z-10 flex h-full w-full flex-col content-center items-center justify-center bg-white bg-opacity-25">
           <Loader />
         </div>
       )}
-      <div className="px-4 py-24 mx-auto">
+      <div className="mx-auto px-4 py-24">
         <article className="relative">
           <section className="space-y-4 sm:mx-auto sm:w-full sm:max-w-lg">
             <header>
-              <p className="mb-2 text-3xl tracking-wider text-white font-cal">{steps[currentStep].title}</p>
+              <p className="font-cal mb-2 text-3xl tracking-wider text-white">{steps[currentStep].title}</p>
               <p className="text-sm font-normal text-white">{steps[currentStep].description}</p>
             </header>
-            <section className="pt-4 space-y-2">
+            <section className="space-y-2 pt-4">
               {user.role === "ADMIN" && (
                 <p className="text-xs font-medium text-gray-500 dark:text-white">
                   {`${t("step")} ${currentStep + 1} ${t("of")} ${steps.length}`}
@@ -479,18 +479,18 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
                         )}
                       />
                     ) : (
-                      <div key={`step-${index}`} className="w-1/4 h-1 bg-white bg-opacity-25" />
+                      <div key={`step-${index}`} className="h-1 w-1/4 bg-white bg-opacity-25" />
                     );
                   })}
                 </section>
               )}
             </section>
           </section>
-          <section className="max-w-xl p-10 mx-auto mt-10 bg-white rounded-sm">
+          <section className="mx-auto mt-10 max-w-xl rounded-sm bg-white p-10">
             {steps[currentStep].Component}
 
             {!steps[currentStep].hideConfirm && (
-              <footer className="flex flex-col mt-8 space-y-6 sm:mx-auto sm:w-full">
+              <footer className="mt-8 flex flex-col space-y-6 sm:mx-auto sm:w-full">
                 <Button
                   className="justify-center"
                   disabled={isSubmitting}
@@ -502,7 +502,7 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
               </footer>
             )}
           </section>
-          <section className="max-w-xl py-8 mx-auto">
+          <section className="mx-auto max-w-xl py-8">
             <div className="flex flex-row-reverse justify-between">
               <button
                 disabled={isSubmitting || !isValid}
