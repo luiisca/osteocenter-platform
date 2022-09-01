@@ -29,6 +29,7 @@ async function getUserFromSession({
     },
     select: {
       id: true,
+      role: true,
       username: true,
       name: true,
       email: true,

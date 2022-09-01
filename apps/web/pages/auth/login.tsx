@@ -83,6 +83,42 @@ export default function Login() {
   return (
     <>
       <AuthContainer title={t("login")} description={t("login")} showLogo heading={t("sign_in_account")}>
+        <>
+          <div className="mt-5">
+            <Button
+              color="secondary"
+              className="flex w-full justify-center"
+              data-testid="google"
+              onClick={async (e) => {
+                e.preventDefault();
+                // track Google logins. Without personal data/payload
+                telemetry.event(telemetryEventTypes.googleLogin, collectPageParameters());
+                await signIn("google");
+              }}>
+              {t("signin_with_google")}
+            </Button>
+          </div>
+          <div className="my-5">
+            <Button
+              color="secondary"
+              className="flex w-full justify-center"
+              data-testid="facebook"
+              onClick={async (e) => {
+                e.preventDefault();
+                await signIn("facebook");
+              }}>
+              {t("signin_with_facebook")}
+            </Button>
+          </div>
+        </>
+        <div className="relative my-4">
+          <div className="absolute inset-0 flex items-center" aria-hidden="true">
+            <div className="w-full border-t border-gray-300" />
+          </div>
+          <div className="relative flex justify-center">
+            <span className="bg-white px-2 text-sm text-gray-500">{t("or")}</span>
+          </div>
+        </div>
         <Form
           form={form}
           className="space-y-6"
@@ -117,36 +153,7 @@ export default function Login() {
             </Button>
           </div>
         </Form>
-
-        <>
-          <div className="mt-5">
-            <Button
-              color="secondary"
-              className="flex w-full justify-center"
-              data-testid="google"
-              onClick={async (e) => {
-                e.preventDefault();
-                // track Google logins. Without personal data/payload
-                telemetry.event(telemetryEventTypes.googleLogin, collectPageParameters());
-                await signIn("google");
-              }}>
-              {t("signin_with_google")}
-            </Button>
-          </div>
-          <div className="my-5">
-            <Button
-              color="secondary"
-              className="flex w-full justify-center"
-              data-testid="facebook"
-              onClick={async (e) => {
-                e.preventDefault();
-                await signIn("facebook");
-              }}>
-              {t("signin_with_facebook")}
-            </Button>
-          </div>
-          {oAuthError && <Alert severity="error" title={errorMessage} />}
-        </>
+        {oAuthError && <Alert severity="error" title={errorMessage} />}
       </AuthContainer>
       <AddToHomescreen />
     </>

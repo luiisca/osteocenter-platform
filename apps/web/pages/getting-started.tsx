@@ -116,7 +116,6 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
   const { status } = useSession();
   const loading = status === "loading";
   const [ready, setReady] = useState(false);
-  const [selectedImport, setSelectedImport] = useState("");
   const [error, setError] = useState<Error | null>(null);
 
   const updateUser = useCallback(
@@ -150,7 +149,6 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
   const nameRef = useRef<HTMLInputElement>(null);
   /** Username */
   const usernameRef = useRef<HTMLInputElement>(null!);
-  const bioRef = useRef<HTMLInputElement>(null);
   /** End Name */
   /** TimeZone */
   const [selectedTimeZone, setSelectedTimeZone] = useState(dayjs.tz.guess());
@@ -228,14 +226,6 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
     router.push("/event-types");
   };
 
-  const schema = z.object({
-    token: z.string(),
-  });
-
-  const formMethods = useForm<{
-    token: string;
-  }>({ resolver: zodResolver(schema), mode: "onSubmit" });
-
   // Should update username on user when being redirected from sign up and doing google/saml
   useEffect(() => {
     async function validateAndSave(username: string) {
@@ -268,80 +258,6 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
       description: t("welcome_instructions"),
       Component: (
         <>
-          {selectedImport == "" && (
-            <div className="mb-4 grid grid-cols-2 gap-x-4">
-              <Button color="secondary" onClick={() => setSelectedImport("calendly")}>
-                {t("import_from")} Calendly
-              </Button>
-              <Button color="secondary" onClick={() => setSelectedImport("savvycal")}>
-                {t("import_from")} SavvyCal
-              </Button>
-            </div>
-          )}
-          {selectedImport && (
-            <div>
-              <h2 className="font-cal text-2xl text-gray-900">
-                {t("import_from")} {selectedImport === "calendly" ? "Calendly" : "SavvyCal"}
-              </h2>
-              <p className="mb-2 text-sm text-gray-500">
-                {t("you_will_need_to_generate")}. Find out how to do this{" "}
-                <a href={`${DOCS_URL}/import`}>here</a>.
-              </p>
-              <form
-                className="flex"
-                onSubmit={formMethods.handleSubmit(async (values) => {
-                  // track the number of imports. Without personal data/payload
-                  telemetry.event(telemetryEventTypes.importSubmitted, {
-                    ...collectPageParameters(),
-                    selectedImport,
-                  });
-                  setSubmitting(true);
-                  const response = await fetch(`/api/import/${selectedImport}`, {
-                    method: "POST",
-                    body: JSON.stringify({
-                      token: values.token,
-                    }),
-                    headers: {
-                      "Content-Type": "application/json",
-                    },
-                  });
-                  if (response.status === 201) {
-                    setSubmitting(false);
-                    handleSkipStep();
-                  } else {
-                    await response.json().catch((e) => {
-                      console.log("Error: response.json invalid: " + e);
-                      setSubmitting(false);
-                    });
-                  }
-                })}>
-                {hasErrors && <Alert severity="error" title={errorMessage} />}
-
-                <input
-                  onChange={async (e) => {
-                    formMethods.setValue("token", e.target.value);
-                  }}
-                  type="text"
-                  name="token"
-                  id="token"
-                  placeholder={t("access_token")}
-                  required
-                  className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
-                />
-                <Button type="submit" className="mt-1 ml-4 h-10">
-                  {t("import")}
-                </Button>
-              </form>
-            </div>
-          )}
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center" aria-hidden="true">
-              <div className="w-full border-t border-gray-300" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-white px-2 text-sm text-gray-500">or</span>
-            </div>
-          </div>
           <form className="sm:mx-auto sm:w-full">
             <section className="space-y-8">
               {user.username !== "" && (
@@ -474,66 +390,6 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
       hideConfirm: true,
       showCancel: false,
     },
-    {
-      id: "profile",
-      title: t("nearly_there"),
-      description: t("nearly_there_instructions"),
-      Component: (
-        <form className="sm:mx-auto sm:w-full" id="ONBOARDING_STEP_4">
-          <section className="space-y-4">
-            <fieldset>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                {t("full_name")}
-              </label>
-              <input
-                ref={nameRef}
-                type="text"
-                name="name"
-                id="name"
-                autoComplete="given-name"
-                placeholder={t("your_name")}
-                defaultValue={user.name || enteredName}
-                required
-                className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
-              />
-            </fieldset>
-            <fieldset>
-              <label htmlFor="bio" className="block text-sm font-medium text-gray-700">
-                {t("about")}
-              </label>
-              <input
-                ref={bioRef}
-                type="text"
-                name="bio"
-                id="bio"
-                required
-                className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
-                defaultValue={user.bio || undefined}
-              />
-              <p className="mt-2 text-sm leading-tight text-gray-500 dark:text-white">
-                {t("few_sentences_about_yourself")}
-              </p>
-            </fieldset>
-          </section>
-        </form>
-      ),
-      hideConfirm: false,
-      confirmText: t("finish"),
-      showCancel: true,
-      cancelText: t("set_up_later"),
-      onComplete: async () => {
-        try {
-          setSubmitting(true);
-          await updateUser({
-            bio: bioRef.current?.value,
-          });
-          setSubmitting(false);
-        } catch (error) {
-          setError(error as Error);
-          setSubmitting(false);
-        }
-      },
-    },
   ];
   /** End Onboarding Steps */
 
@@ -549,7 +405,7 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
   return (
     <div className="bg-brand min-h-screen" data-testid="onboarding">
       <Head>
-        <title>Cal.com - {t("getting_started")}</title>
+        <title>Osteocenter - {t("getting_started")}</title>
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
@@ -566,28 +422,32 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
               <p className="text-sm font-normal text-white">{steps[currentStep].description}</p>
             </header>
             <section className="space-y-2 pt-4">
-              <p className="text-xs font-medium text-gray-500 dark:text-white">
-                Step {currentStep + 1} of {steps.length}
-              </p>
+              {user.role === "ADMIN" && (
+                <p className="text-xs font-medium text-gray-500 dark:text-white">
+                  {`${t("step")} ${currentStep + 1} ${t("of")} ${steps.length}`}
+                </p>
+              )}
 
               {error && <Alert severity="error" message={error?.message} />}
 
-              <section className="flex w-full space-x-2 rtl:space-x-reverse">
-                {steps.map((s, index) => {
-                  return index <= currentStep ? (
-                    <div
-                      key={`step-${index}`}
-                      onClick={() => goToStep(index)}
-                      className={classnames(
-                        "h-1 w-1/4 bg-white",
-                        index < currentStep ? "cursor-pointer" : ""
-                      )}
-                    />
-                  ) : (
-                    <div key={`step-${index}`} className="h-1 w-1/4 bg-white bg-opacity-25" />
-                  );
-                })}
-              </section>
+              {user.role === "ADMIN" && (
+                <section className="flex w-full space-x-2 rtl:space-x-reverse">
+                  {steps.map((s, index) => {
+                    return index <= currentStep ? (
+                      <div
+                        key={`step-${index}`}
+                        onClick={() => goToStep(index)}
+                        className={classnames(
+                          "h-1 w-1/4 bg-white",
+                          index < currentStep ? "cursor-pointer" : ""
+                        )}
+                      />
+                    ) : (
+                      <div key={`step-${index}`} className="h-1 w-1/4 bg-white bg-opacity-25" />
+                    );
+                  })}
+                </section>
+              )}
             </section>
           </section>
           <section className="mx-auto mt-10 max-w-xl rounded-sm bg-white p-10">
@@ -647,6 +507,7 @@ export async function getServerSideProps(context: NextPageContext) {
     },
     select: {
       id: true,
+      role: true,
       startTime: true,
       endTime: true,
       username: true,

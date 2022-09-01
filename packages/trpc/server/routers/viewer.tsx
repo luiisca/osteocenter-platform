@@ -712,30 +712,24 @@ const loggedInViewerRouter = createProtectedRouter()
         data.avatar = await resizeBase64Image(input.avatar);
       }
 
-      const updatedUser = await prisma.user.update({
+      await prisma.user.update({
         where: {
           id: user.id,
         },
         data,
-        select: {
-          id: true,
-          username: true,
-          email: true,
-          metadata: true,
-        },
       });
 
-      // Notify stripe about the change
-      if (updatedUser && updatedUser.metadata && hasKeyInMetadata(updatedUser, "stripeCustomerId")) {
-        const stripeCustomerId = `${updatedUser.metadata.stripeCustomerId}`;
-        await stripe.customers.update(stripeCustomerId, {
-          metadata: {
-            username: updatedUser.username,
-            email: updatedUser.email,
-            userId: updatedUser.id,
-          },
-        });
-      }
+      // // Notify stripe about the change
+      // if (updatedUser && updatedUser.metadata && hasKeyInMetadata(updatedUser, "stripeCustomerId")) {
+      //   const stripeCustomerId = `${updatedUser.metadata.stripeCustomerId}`;
+      //   await stripe.customers.update(stripeCustomerId, {
+      //     metadata: {
+      //       username: updatedUser.username,
+      //       email: updatedUser.email,
+      //       userId: updatedUser.id,
+      //     },
+      //   });
+      // }
     },
   })
   .mutation("eventTypeOrder", {

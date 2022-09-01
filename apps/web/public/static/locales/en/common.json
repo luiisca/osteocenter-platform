@@ -1039,5 +1039,6 @@
   "download_desktop_app": "Download desktop app",
   "set_ping_link": "Set Ping link",
   "email_already_registered_with_different_provider": "Account already registered with another provider (Google, Facebook or Magic Link). Please try again using the one you registered your account with.",
-  "magic_link": "Magic Link"
+  "magic_link": "Magic Link",
+  "step": "Step"
 }
