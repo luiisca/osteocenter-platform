@@ -104,27 +104,29 @@ function CalendarList(props: Props) {
       query={query}
       success={({ data }) => (
         <List>
-          {data.items.map((item) => (
-            <IntegrationListItem
-              name={item.name}
-              slug={item.slug}
-              key={item.title}
-              title={item.title}
-              logo={item.logo}
-              description={item.description}
-              actions={
-                <InstallAppButton
-                  type={item.type}
-                  render={(buttonProps) => (
-                    <Button color="secondary" {...buttonProps}>
-                      {t("connect")}
-                    </Button>
-                  )}
-                  onChanged={() => props.onChanged()}
-                />
-              }
-            />
-          ))}
+          {data.items
+            .filter((item) => item.slug === "google-calendar")
+            .map((item) => (
+              <IntegrationListItem
+                name={item.name}
+                slug={item.slug}
+                key={item.title}
+                title={item.title}
+                logo={item.logo}
+                description={item.description}
+                actions={
+                  <InstallAppButton
+                    type={item.type}
+                    render={(buttonProps) => (
+                      <Button color="secondary" {...buttonProps}>
+                        {t("connect")}
+                      </Button>
+                    )}
+                    onChanged={() => props.onChanged()}
+                  />
+                }
+              />
+            ))}
         </List>
       )}
     />

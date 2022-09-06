@@ -29,8 +29,12 @@ async function getUserFromSession({
     },
     select: {
       id: true,
+      role: true,
       username: true,
-      name: true,
+      firstName: true,
+      lastName: true,
+      DNI: true,
+      phoneNumber: true,
       email: true,
       bio: true,
       timeZone: true,
@@ -73,6 +77,16 @@ async function getUserFromSession({
       locale: true,
       timeFormat: true,
       trialEndsAt: true,
+      patientProfile: {
+        select: {
+          id: true,
+        },
+      },
+      doctorProfile: {
+        select: {
+          id: true,
+        },
+      },
     },
   });
 
@@ -103,6 +117,7 @@ async function getUserFromSession({
 export const createContext = async ({ req }: CreateContextOptions) => {
   // for API-response caching see https://trpc.io/docs/caching
   const session = await getSession({ req });
+  console.log("SESSION CONTEXT", session);
 
   const user = await getUserFromSession({ session, req });
   const locale = user?.locale ?? getLocaleFromHeaders(req);

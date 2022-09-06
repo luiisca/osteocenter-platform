@@ -31,7 +31,10 @@ interface ICustomUsernameProps {
   user: Pick<
     User,
     | "username"
-    | "name"
+    | "firstName"
+    | "lastName"
+    | "DNI"
+    | "phoneNumber"
     | "email"
     | "bio"
     | "avatar"
@@ -258,7 +261,7 @@ const PremiumTextfield = (props: ICustomUsernameProps) => {
             <div className="mb-4 w-full px-4 pt-1">
               <DialogHeader title={t("confirm_username_change_dialog_title")} />
               {usernameChangeCondition && usernameChangeCondition !== UsernameChangeStatusEnum.NORMAL && (
-                <p className="-mt-4 mb-4 text-sm text-gray-800">
+                <p className="mb-4 -mt-4 text-sm text-gray-800">
                   {usernameChangeCondition === UsernameChangeStatusEnum.UPGRADE &&
                     t("change_username_standard_to_premium")}
                   {usernameChangeCondition === UsernameChangeStatusEnum.DOWNGRADE &&

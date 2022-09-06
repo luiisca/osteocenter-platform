@@ -1,25 +1,20 @@
 import { IdentityProvider, UserPermissionRole } from "@prisma/client";
 import { readFileSync } from "fs";
 import Handlebars from "handlebars";
-import NextAuth, { Session } from "next-auth";
+import NextAuth, { Session, NextAuthOptions } from "next-auth";
 import { Provider } from "next-auth/providers";
-import CredentialsProvider from "next-auth/providers/credentials";
 import EmailProvider from "next-auth/providers/email";
 import FacebookProvider from "next-auth/providers/facebook";
 import GoogleProvider from "next-auth/providers/google";
 import nodemailer, { TransportOptions } from "nodemailer";
-import { authenticator } from "otplib";
 import path from "path";
 
 import checkLicense from "@calcom/features/ee/common/server/checkLicense";
-import ImpersonationProvider from "@calcom/features/ee/impersonation/lib/ImpersonationProvider";
 import { WEBAPP_URL } from "@calcom/lib/constants";
-import { symmetricDecrypt } from "@calcom/lib/crypto";
 import { defaultCookies } from "@calcom/lib/default-cookies";
 import { serverConfig } from "@calcom/lib/serverConfig";
 import prisma from "@calcom/prisma";
 
-import { ErrorCode, verifyPassword } from "@lib/auth";
 import CalComAdapter from "@lib/auth/next-auth-custom-adapter";
 import { randomString } from "@lib/random";
 import { hostedCal } from "@lib/saml";
@@ -86,7 +81,7 @@ if (true) {
   );
 }
 const calcomAdapter = CalComAdapter(prisma);
-export default NextAuth({
+export const authOptions: NextAuthOptions = {
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore
   adapter: calcomAdapter,
@@ -338,4 +333,5 @@ export default NextAuth({
       return baseUrl;
     },
   },
-});
+};
+export default NextAuth(authOptions);

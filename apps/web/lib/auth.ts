@@ -36,7 +36,7 @@ export enum ErrorCode {
 }
 
 export const identityProviderNameMap: { [key in IdentityProvider]: string } = {
-  [IdentityProvider.CAL]: "Cal",
+  [IdentityProvider.MAGIC]: "Magic",
   [IdentityProvider.GOOGLE]: "Google",
-  [IdentityProvider.SAML]: "SAML",
+  [IdentityProvider.FACEBOOK]: "Facebook",
 };

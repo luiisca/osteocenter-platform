@@ -129,7 +129,12 @@ enum UserPermissionRole {
 model User {
   id                   Int                     @id @default(autoincrement())
   username             String?                 @unique
-  name                 String?
+  firstName            String                  @default("Pedro")
+  lastName             String                  @default("Huerta")
+  /// @zod.custom(imports.phoneNumber)
+  phoneNumber          Int?                    @unique
+  /// @zod.custom(imports.DNI)
+  DNI                  Int                     @unique @default(99999999)
   /// @zod.email()
   email                String                  @unique
   emailVerified        DateTime?
@@ -186,9 +191,9 @@ model User {
   ownedEventTypes      EventType[]             @relation("owner")
   workflows            Workflow[]
   routingForms         App_RoutingForms_Form[] @relation("routing-form")
-  patient              Patient?                @relation(fields: [patientDNI], references: [DNI])
-  patientDNI           Int?                    @unique
-  doctor               Doctor?                 @relation(fields: [doctorId], references: [id])
+  patientProfile       PatientProfile?         @relation(fields: [patientId], references: [id])
+  patientId            Int?                    @unique
+  doctorProfile        DoctorProfile?          @relation(fields: [doctorId], references: [id])
   doctorId             Int?                    @unique
 
   @@map(name: "users")
@@ -595,13 +600,12 @@ enum WorkflowMethods {
   SMS
 }
 
-model Patient {
+model PatientProfile {
   id   Int   @id @default(autoincrement())
-  DNI  Int   @unique
   user User?
 }
 
-model Doctor {
+model DoctorProfile {
   id   Int   @id @default(autoincrement())
   user User?
 }

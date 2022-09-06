@@ -127,3 +127,30 @@ export const successRedirectUrl = z
       .regex(/^http(s)?:\/\/.*/),
   ])
   .optional();
+
+export const phoneNumber = z.number().int().positive().gte(9).lte(9);
+export const DNI = z.number().int().positive().gte(8).lte(8);
+
+export const profileData = z.object({
+  username: z.string().min(4, { message: "min_length_4" }),
+  firstName: z.string().min(2, { message: "min_length_2" }),
+  lastName: z.string().min(2, { message: "min_length_2" }),
+  phoneNumber: z.number().int().positive().gte(9).lte(9),
+  DNI: z.number().int().positive().gte(8).lte(8),
+  email: z.string().email().optional(),
+  bio: z.string().optional(),
+  avatar: z.string().optional(),
+  timeZone: z.string().optional(),
+  weekStart: z.string().optional(),
+  hideBranding: z.boolean().optional(),
+  allowDynamicBooking: z.boolean().optional(),
+  brandColor: z.string().optional(),
+  darkBrandColor: z.string().optional(),
+  theme: z.string().optional().nullable(),
+  completedOnboarding: z.boolean().optional(),
+  locale: z.string().optional(),
+  timeFormat: z.number().optional(),
+  disableImpersonation: z.boolean().optional(),
+});
+
+export type ProfileDataInputType = z.infer<typeof profileData>;

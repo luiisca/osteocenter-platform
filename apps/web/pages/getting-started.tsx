@@ -9,17 +9,15 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import * as z from "zod";
 
 import getApps from "@calcom/app-store/utils";
 import dayjs from "@calcom/dayjs";
 import { DEFAULT_SCHEDULE } from "@calcom/lib/availability";
-import { DOCS_URL } from "@calcom/lib/constants";
 import { fetchUsername } from "@calcom/lib/fetchUsername";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import showToast from "@calcom/lib/notification";
-import { collectPageParameters, telemetryEventTypes, useTelemetry } from "@calcom/lib/telemetry";
 import prisma from "@calcom/prisma";
+import { profileData, ProfileDataInputType } from "@calcom/prisma/zod-utils";
 import { trpc } from "@calcom/trpc/react";
 import type { AppRouter } from "@calcom/trpc/server/routers/_app";
 import { Alert } from "@calcom/ui/Alert";
@@ -54,7 +52,6 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
   const { user } = props;
   const router = useRouter();
   const utils = trpc.useContext();
-  const telemetry = useTelemetry();
   const [hasErrors, setHasErrors] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const { data: eventTypes } = trpc.useQuery(["viewer.eventTypes.list"]);
@@ -72,7 +69,6 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
   const mutation = trpc.useMutation("viewer.updateProfile", {
     onSuccess: async () => {
       setSubmitting(true);
-      setEnteredName(nameRef.current?.value || "");
       setInputUsernameValue(usernameRef.current?.value || "");
       if (mutationComplete) {
         mutationComplete(null);
@@ -109,14 +105,12 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
   ];
 
   const [isSubmitting, setSubmitting] = React.useState(false);
-  const [enteredName, setEnteredName] = React.useState("");
   const [currentUsername, setCurrentUsername] = useState(user.username || undefined);
   const [inputUsernameValue, setInputUsernameValue] = useState(currentUsername);
 
   const { status } = useSession();
   const loading = status === "loading";
   const [ready, setReady] = useState(false);
-  const [selectedImport, setSelectedImport] = useState("");
   const [error, setError] = useState<Error | null>(null);
 
   const updateUser = useCallback(
@@ -146,24 +140,20 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
     },
   });
 
-  /** Name */
-  const nameRef = useRef<HTMLInputElement>(null);
   /** Username */
   const usernameRef = useRef<HTMLInputElement>(null!);
-  const bioRef = useRef<HTMLInputElement>(null);
-  /** End Name */
   /** TimeZone */
   const [selectedTimeZone, setSelectedTimeZone] = useState(dayjs.tz.guess());
   /** End TimeZone */
 
   /** Onboarding Steps */
   const [currentStep, setCurrentStep] = useState(props.initialStep);
-  const handleConfirmStep = async () => {
+  const handleConfirmStep = async (formData: ProfileDataInputType | null) => {
     try {
       setSubmitting(true);
       const onComplete = steps[currentStep]?.onComplete;
       if (onComplete) {
-        await onComplete();
+        await onComplete(formData);
       }
       incrementStep();
       setSubmitting(false);
@@ -175,14 +165,10 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
 
   const debouncedHandleConfirmStep = debounce(handleConfirmStep, 850);
 
-  const handleSkipStep = () => {
-    incrementStep();
-  };
-
   const incrementStep = () => {
     const nextStep = currentStep + 1;
 
-    if (nextStep >= steps.length) {
+    if (nextStep >= (user.role === "ADMIN" ? steps.length : 1)) {
       completeOnboarding();
       return;
     }
@@ -228,14 +214,6 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
     router.push("/event-types");
   };
 
-  const schema = z.object({
-    token: z.string(),
-  });
-
-  const formMethods = useForm<{
-    token: string;
-  }>({ resolver: zodResolver(schema), mode: "onSubmit" });
-
   // Should update username on user when being redirected from sign up and doing google/saml
   useEffect(() => {
     async function validateAndSave(username: string) {
@@ -260,89 +238,22 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
     }
   }, [updateUser]);
 
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isValid },
+  } = useForm<ProfileDataInputType>({
+    resolver: zodResolver(profileData),
+  });
   const availabilityForm = useForm({ defaultValues: { schedule: DEFAULT_SCHEDULE } });
   const steps = [
     {
       id: t("welcome"),
-      title: t("welcome_to_calcom"),
+      title: t("welcome_to_osteocenter"),
       description: t("welcome_instructions"),
       Component: (
         <>
-          {selectedImport == "" && (
-            <div className="mb-4 grid grid-cols-2 gap-x-4">
-              <Button color="secondary" onClick={() => setSelectedImport("calendly")}>
-                {t("import_from")} Calendly
-              </Button>
-              <Button color="secondary" onClick={() => setSelectedImport("savvycal")}>
-                {t("import_from")} SavvyCal
-              </Button>
-            </div>
-          )}
-          {selectedImport && (
-            <div>
-              <h2 className="font-cal text-2xl text-gray-900">
-                {t("import_from")} {selectedImport === "calendly" ? "Calendly" : "SavvyCal"}
-              </h2>
-              <p className="mb-2 text-sm text-gray-500">
-                {t("you_will_need_to_generate")}. Find out how to do this{" "}
-                <a href={`${DOCS_URL}/import`}>here</a>.
-              </p>
-              <form
-                className="flex"
-                onSubmit={formMethods.handleSubmit(async (values) => {
-                  // track the number of imports. Without personal data/payload
-                  telemetry.event(telemetryEventTypes.importSubmitted, {
-                    ...collectPageParameters(),
-                    selectedImport,
-                  });
-                  setSubmitting(true);
-                  const response = await fetch(`/api/import/${selectedImport}`, {
-                    method: "POST",
-                    body: JSON.stringify({
-                      token: values.token,
-                    }),
-                    headers: {
-                      "Content-Type": "application/json",
-                    },
-                  });
-                  if (response.status === 201) {
-                    setSubmitting(false);
-                    handleSkipStep();
-                  } else {
-                    await response.json().catch((e) => {
-                      console.log("Error: response.json invalid: " + e);
-                      setSubmitting(false);
-                    });
-                  }
-                })}>
-                {hasErrors && <Alert severity="error" title={errorMessage} />}
-
-                <input
-                  onChange={async (e) => {
-                    formMethods.setValue("token", e.target.value);
-                  }}
-                  type="text"
-                  name="token"
-                  id="token"
-                  placeholder={t("access_token")}
-                  required
-                  className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
-                />
-                <Button type="submit" className="mt-1 ml-4 h-10">
-                  {t("import")}
-                </Button>
-              </form>
-            </div>
-          )}
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center" aria-hidden="true">
-              <div className="w-full border-t border-gray-300" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-white px-2 text-sm text-gray-500">or</span>
-            </div>
-          </div>
-          <form className="sm:mx-auto sm:w-full">
+          <form onSubmit={handleSubmit(debouncedHandleConfirmStep)} className="sm:mx-auto sm:w-full">
             <section className="space-y-8">
               {user.username !== "" && (
                 <UsernameAvailability
@@ -357,20 +268,64 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
                 />
               )}
               <fieldset>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                  {t("full_name")}
+                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
+                  {t("first_name")}
                 </label>
                 <input
-                  ref={nameRef}
                   type="text"
-                  name="name"
-                  id="name"
+                  id="firstName"
                   autoComplete="given-name"
-                  placeholder={t("your_name")}
-                  defaultValue={user.name ?? enteredName}
-                  required
+                  placeholder={t("first_name")}
+                  {...register("firstName")}
                   className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
                 />
+                {errors.firstName && (
+                  <p className="text-red-400 sm:text-sm">{t(errors.firstName.message as string)}</p>
+                )}
+
+                <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
+                  {t("last_name")}
+                </label>
+                <input
+                  id="lastName"
+                  type="text"
+                  autoComplete="family-name"
+                  placeholder={t("last_name")}
+                  {...register("lastName")}
+                  className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
+                />
+                {errors.lastName && (
+                  <p className="text-red-400 sm:text-sm">{t(errors.lastName.message as string)}</p>
+                )}
+              </fieldset>
+              <fieldset>
+                <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
+                  {t("phone_number")}
+                </label>
+                <input
+                  {...register("phoneNumber")}
+                  type="tel"
+                  id="phoneNumber"
+                  autoComplete="tel"
+                  placeholder="+51931109731"
+                  className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
+                />
+                {errors.phoneNumber && (
+                  <p className="text-red-400 sm:text-sm">{t(errors.phoneNumber.message as string)}</p>
+                )}
+              </fieldset>
+              <fieldset>
+                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
+                  {t("DNI")}
+                </label>
+                <input
+                  {...register("DNI")}
+                  type="tel"
+                  id="DNI"
+                  placeholder="76097512"
+                  className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
+                />
+                {errors.DNI && <p className="text-red-400 sm:text-sm">{t(errors.DNI.message as string)}</p>}
               </fieldset>
 
               <fieldset>
@@ -398,7 +353,7 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
       confirmText: t("continue"),
       showCancel: true,
       cancelText: t("set_up_later"),
-      onComplete: async () => {
+      onComplete: async (formData: ProfileDataInputType | null) => {
         mutationComplete = null;
         setError(null);
         const mutationAsync = new Promise((resolve, reject) => {
@@ -411,13 +366,9 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
           };
         });
 
-        const userUpdateData = {
-          name: nameRef.current?.value,
-          username: usernameRef.current?.value,
-          timeZone: selectedTimeZone,
-        };
-
-        mutation.mutate(userUpdateData);
+        if (formData) {
+          mutation.mutate(formData);
+        }
 
         if (mutationComplete) {
           await mutationAsync;
@@ -453,7 +404,7 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
                 name: t("default_schedule_name"),
                 ...values,
               });
-              debouncedHandleConfirmStep();
+              debouncedHandleConfirmStep(null);
               setSubmitting(false);
             } catch (error) {
               if (error instanceof Error) {
@@ -474,66 +425,6 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
       hideConfirm: true,
       showCancel: false,
     },
-    {
-      id: "profile",
-      title: t("nearly_there"),
-      description: t("nearly_there_instructions"),
-      Component: (
-        <form className="sm:mx-auto sm:w-full" id="ONBOARDING_STEP_4">
-          <section className="space-y-4">
-            <fieldset>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                {t("full_name")}
-              </label>
-              <input
-                ref={nameRef}
-                type="text"
-                name="name"
-                id="name"
-                autoComplete="given-name"
-                placeholder={t("your_name")}
-                defaultValue={user.name || enteredName}
-                required
-                className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
-              />
-            </fieldset>
-            <fieldset>
-              <label htmlFor="bio" className="block text-sm font-medium text-gray-700">
-                {t("about")}
-              </label>
-              <input
-                ref={bioRef}
-                type="text"
-                name="bio"
-                id="bio"
-                required
-                className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
-                defaultValue={user.bio || undefined}
-              />
-              <p className="mt-2 text-sm leading-tight text-gray-500 dark:text-white">
-                {t("few_sentences_about_yourself")}
-              </p>
-            </fieldset>
-          </section>
-        </form>
-      ),
-      hideConfirm: false,
-      confirmText: t("finish"),
-      showCancel: true,
-      cancelText: t("set_up_later"),
-      onComplete: async () => {
-        try {
-          setSubmitting(true);
-          await updateUser({
-            bio: bioRef.current?.value,
-          });
-          setSubmitting(false);
-        } catch (error) {
-          setError(error as Error);
-          setSubmitting(false);
-        }
-      },
-    },
   ];
   /** End Onboarding Steps */
 
@@ -549,7 +440,7 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
   return (
     <div className="bg-brand min-h-screen" data-testid="onboarding">
       <Head>
-        <title>Cal.com - {t("getting_started")}</title>
+        <title>Osteocenter - {t("getting_started")}</title>
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
@@ -566,28 +457,33 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
               <p className="text-sm font-normal text-white">{steps[currentStep].description}</p>
             </header>
             <section className="space-y-2 pt-4">
-              <p className="text-xs font-medium text-gray-500 dark:text-white">
-                Step {currentStep + 1} of {steps.length}
-              </p>
+              {user.role === "ADMIN" && (
+                <p className="text-xs font-medium text-gray-500 dark:text-white">
+                  {`${t("step")} ${currentStep + 1} ${t("of")} ${steps.length}`}
+                </p>
+              )}
 
               {error && <Alert severity="error" message={error?.message} />}
+              {hasErrors && <Alert severity="error" message={errorMessage} />}
 
-              <section className="flex w-full space-x-2 rtl:space-x-reverse">
-                {steps.map((s, index) => {
-                  return index <= currentStep ? (
-                    <div
-                      key={`step-${index}`}
-                      onClick={() => goToStep(index)}
-                      className={classnames(
-                        "h-1 w-1/4 bg-white",
-                        index < currentStep ? "cursor-pointer" : ""
-                      )}
-                    />
-                  ) : (
-                    <div key={`step-${index}`} className="h-1 w-1/4 bg-white bg-opacity-25" />
-                  );
-                })}
-              </section>
+              {user.role === "ADMIN" && (
+                <section className="flex w-full space-x-2 rtl:space-x-reverse">
+                  {steps.map((s, index) => {
+                    return index <= currentStep ? (
+                      <div
+                        key={`step-${index}`}
+                        onClick={() => goToStep(index)}
+                        className={classnames(
+                          "h-1 w-1/4 bg-white",
+                          index < currentStep ? "cursor-pointer" : ""
+                        )}
+                      />
+                    ) : (
+                      <div key={`step-${index}`} className="h-1 w-1/4 bg-white bg-opacity-25" />
+                    );
+                  })}
+                </section>
+              )}
             </section>
           </section>
           <section className="mx-auto mt-10 max-w-xl rounded-sm bg-white p-10">
@@ -598,7 +494,7 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
                 <Button
                   className="justify-center"
                   disabled={isSubmitting}
-                  onClick={debouncedHandleConfirmStep}
+                  onClick={() => debouncedHandleConfirmStep(null)}
                   EndIcon={Icon.FiArrowRight}
                   data-testid={`continue-button-${currentStep}`}>
                   {steps[currentStep].confirmText}
@@ -609,10 +505,10 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
           <section className="mx-auto max-w-xl py-8">
             <div className="flex flex-row-reverse justify-between">
               <button
-                disabled={isSubmitting}
-                onClick={handleSkipStep}
+                disabled={isSubmitting || !isValid}
+                onClick={incrementStep}
                 className="text-sm leading-tight text-gray-500 dark:text-white">
-                {t("next_step")}
+                {t(currentStep === 1 ? "next_step" : "skip_step")}
               </button>
               {currentStep !== 0 && (
                 <button
@@ -647,10 +543,14 @@ export async function getServerSideProps(context: NextPageContext) {
     },
     select: {
       id: true,
+      role: true,
       startTime: true,
       endTime: true,
       username: true,
-      name: true,
+      firstName: true,
+      lastName: true,
+      DNI: true,
+      phoneNumber: true,
       email: true,
       bio: true,
       avatar: true,
@@ -694,6 +594,7 @@ export async function getServerSideProps(context: NextPageContext) {
       },
     },
   });
+
   if (!user) {
     throw new Error(`Signed in as ${session.user.id} but cannot be found in db`);
   }
