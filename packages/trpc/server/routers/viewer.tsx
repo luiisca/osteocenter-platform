@@ -1,6 +1,5 @@
 import { AppCategories, BookingStatus, MembershipRole, Prisma } from "@prisma/client";
 import _ from "lodash";
-import omit from "lodash/omit";
 import { JSONObject } from "superjson/dist/types";
 import { z } from "zod";
 
@@ -29,7 +28,7 @@ import { getTranslation } from "@calcom/lib/server/i18n";
 import { isTeamOwner } from "@calcom/lib/server/queries/teams";
 import slugify from "@calcom/lib/slugify";
 import prisma, { baseEventTypeSelect, bookingMinimalSelect } from "@calcom/prisma";
-import { profileData, DNI } from "@calcom/prisma/zod-utils";
+import { profileData } from "@calcom/prisma/zod-utils";
 import { resizeBase64Image } from "@calcom/web/server/lib/resizeBase64Image";
 
 import { TRPCError } from "@trpc/server";
@@ -81,9 +80,7 @@ const loggedInViewerRouter = createProtectedRouter()
       // pick only the part we want to expose in the API
       return {
         id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        DNI: user.DNI,
+        name: user.name,
         phoneNumber: user.phoneNumber,
         username: user.username,
         email: user.email,
@@ -148,9 +145,7 @@ const loggedInViewerRouter = createProtectedRouter()
           select: {
             id: true,
             username: true,
-            firstName: true,
-            lastName: true,
-            DNI: true,
+            name: true,
             phoneNumber: true,
           },
         },
@@ -164,9 +159,7 @@ const loggedInViewerRouter = createProtectedRouter()
         select: {
           id: true,
           username: true,
-          firstName: true,
-          lastName: true,
-          DNI: true,
+          name: true,
           phoneNumber: true,
           startTime: true,
           endTime: true,
@@ -245,7 +238,7 @@ const loggedInViewerRouter = createProtectedRouter()
         teamId?: number | null;
         profile: {
           slug: typeof user["username"];
-          name: typeof user["firstName"];
+          name: typeof user["name"];
         };
         metadata: {
           membershipCount: number;
@@ -268,7 +261,7 @@ const loggedInViewerRouter = createProtectedRouter()
         teamId: null,
         profile: {
           slug: user.username,
-          name: user.firstName,
+          name: user.name,
         },
         eventTypes: _.orderBy(mergedEventTypes, ["position", "id"], ["desc", "asc"]),
         metadata: {
@@ -282,7 +275,7 @@ const loggedInViewerRouter = createProtectedRouter()
         user.teams.map((membership) => ({
           teamId: membership.team.id,
           profile: {
-            name: membership.team.name,
+            name: membership.team.name || "",
             image: membership.team.logo || "",
             slug: "team/" + membership.team.slug,
           },
@@ -685,14 +678,33 @@ const loggedInViewerRouter = createProtectedRouter()
     },
   })
   .mutation("updateProfile", {
-    input: profileData,
+    input: z.object({
+      username: z.string().optional(),
+      name: z.string().optional(),
+      firstName: z.string().optional(),
+      lastName: z.string().optional(),
+      phoneNumber: z.string().optional(),
+      DNI: z.string().optional(),
+      email: z.string().email().optional(),
+      bio: z.string().optional(),
+      avatar: z.string().optional(),
+      timeZone: z.string().optional(),
+      weekStart: z.string().optional(),
+      hideBranding: z.boolean().optional(),
+      allowDynamicBooking: z.boolean().optional(),
+      brandColor: z.string().optional(),
+      darkBrandColor: z.string().optional(),
+      theme: z.string().optional().nullable(),
+      completedOnboarding: z.boolean().optional(),
+      locale: z.string().optional(),
+      timeFormat: z.number().optional(),
+      disableImpersonation: z.boolean().optional(),
+    }),
     async resolve({ input, ctx }) {
       const { user, prisma } = ctx;
-      const data: Prisma.UserUpdateInput = {
-        ...input,
-      };
-      if (input.username) {
-        const username = slugify(input.username);
+      const data: Prisma.UserUpdateInput = _.omit(input, ["DNI"]);
+      if (input?.username) {
+        const username = slugify(input?.username);
         // Only validate if we're changing usernames
         if (username !== user.username) {
           data.username = username;
@@ -702,11 +714,11 @@ const loggedInViewerRouter = createProtectedRouter()
           }
         }
       }
-      if (input.avatar) {
-        data.avatar = await resizeBase64Image(input.avatar);
+      if (input?.avatar) {
+        data.avatar = await resizeBase64Image(input?.avatar);
       }
 
-      if (user.role === "USER") {
+      if (user.role === "USER" && input?.DNI) {
         await prisma.user.update({
           where: {
             id: user.id,
@@ -716,7 +728,24 @@ const loggedInViewerRouter = createProtectedRouter()
             patientProfile: {
               connectOrCreate: {
                 where: {
-                  id: user.patientProfile.id,
+                  DNI: input?.DNI,
+                },
+                create: { id: user.id },
+              },
+            },
+          },
+        });
+      } else if (user.role === "ADMIN" && input?.DNI) {
+        await prisma.user.update({
+          where: {
+            id: user.id,
+          },
+          data: {
+            ...data,
+            doctorProfile: {
+              connectOrCreate: {
+                where: {
+                  DNI: input?.DNI,
                 },
                 create: { id: user.id },
               },
@@ -728,17 +757,7 @@ const loggedInViewerRouter = createProtectedRouter()
           where: {
             id: user.id,
           },
-          data: {
-            ...data,
-            doctorProfile: {
-              connectOrCreate: {
-                where: {
-                  id: user.doctorProfile.id,
-                },
-                create: { id: user.id },
-              },
-            },
-          },
+          data,
         });
       }
 
@@ -1139,9 +1158,7 @@ const loggedInViewerRouter = createProtectedRouter()
                       credentials: true,
                       email: true,
                       timeZone: true,
-                      firstName: true,
-                      lastName: true,
-                      DNI: true,
+                      name: true,
                       phoneNumber: true,
                       destinationCalendar: true,
                       locale: true,
@@ -1230,7 +1247,7 @@ const loggedInViewerRouter = createProtectedRouter()
                   endTime: booking.endTime.toISOString(),
                   organizer: {
                     email: booking?.user?.email as string,
-                    name: booking?.user?.firstName ?? "Nameless",
+                    name: booking?.user?.name ?? "Nameless",
                     timeZone: booking?.user?.timeZone as string,
                     language: { translate: tOrganizer, locale: booking?.user?.locale ?? "en" },
                   },

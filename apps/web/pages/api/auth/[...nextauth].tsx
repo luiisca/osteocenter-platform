@@ -61,7 +61,7 @@ if (true) {
           encoding: "utf8",
         });
         const emailTemplate = Handlebars.compile(emailFile);
-        const result = await transporter.sendMail({
+        transporter.sendMail({
           from: `${process.env.EMAIL_FROM}` || "Clínica Osteocenter",
           to: identifier,
           subject: "Bienvenido a tu cuenta Osteocenter",
@@ -71,11 +71,6 @@ if (true) {
             email: identifier,
           }),
         });
-        console.log("MAGIC LINK RESULT", result);
-        const failed = result.rejected.concat(result.pending).filter(Boolean);
-        if (failed.length) {
-          new Error(`Email(s) (${failed.join(", ")}) no se pudo enviar`);
-        }
       },
     })
   );

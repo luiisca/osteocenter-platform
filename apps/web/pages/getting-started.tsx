@@ -253,7 +253,7 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
       description: t("welcome_instructions"),
       Component: (
         <>
-          <form onSubmit={handleSubmit(debouncedHandleConfirmStep)} className="sm:mx-auto sm:w-full">
+          <form className="sm:mx-auto sm:w-full">
             <section className="space-y-8">
               {user.username !== "" && (
                 <UsernameAvailability
@@ -278,6 +278,7 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
                   placeholder={t("first_name")}
                   {...register("firstName")}
                   className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
+                  defaultValue={user.firstName || undefined}
                 />
                 {errors.firstName && (
                   <p className="text-red-400 sm:text-sm">{t(errors.firstName.message as string)}</p>
@@ -293,6 +294,7 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
                   placeholder={t("last_name")}
                   {...register("lastName")}
                   className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
+                  defaultValue={user.lastName || undefined}
                 />
                 {errors.lastName && (
                   <p className="text-red-400 sm:text-sm">{t(errors.lastName.message as string)}</p>
@@ -304,14 +306,15 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
                 </label>
                 <input
                   {...register("phoneNumber")}
-                  type="tel"
                   id="phoneNumber"
                   autoComplete="tel"
                   placeholder="+51931109731"
                   className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
+                  defaultValue={user.phoneNumber || undefined}
                 />
+                <>{console.log("INPUT ERRORS", errors)}</>
                 {errors.phoneNumber && (
-                  <p className="text-red-400 sm:text-sm">{t(errors.phoneNumber.message as string)}</p>
+                  <p className="text-red-400 sm:text-sm">{t(errors.phoneNumber.message)}</p>
                 )}
               </fieldset>
               <fieldset>
@@ -320,12 +323,14 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
                 </label>
                 <input
                   {...register("DNI")}
-                  type="tel"
                   id="DNI"
                   placeholder="76097512"
                   className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
+                  defaultValue={
+                    (user.role === "USER" ? user?.patientProfile?.DNI : user?.doctorProfile?.DNI) || undefined
+                  }
                 />
-                {errors.DNI && <p className="text-red-400 sm:text-sm">{t(errors.DNI.message as string)}</p>}
+                {errors.DNI && <p className="text-red-400 sm:text-sm">{t(errors.DNI.message)}</p>}
               </fieldset>
 
               <fieldset>
@@ -367,7 +372,8 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
         });
 
         if (formData) {
-          mutation.mutate(formData);
+          const name = `${formData.firstName} ${formData.lastName}`;
+          mutation.mutate({ ...formData, name });
         }
 
         if (mutationComplete) {
@@ -494,7 +500,7 @@ export default function Onboarding(props: inferSSRProps<typeof getServerSideProp
                 <Button
                   className="justify-center"
                   disabled={isSubmitting}
-                  onClick={() => debouncedHandleConfirmStep(null)}
+                  onClick={handleSubmit(debouncedHandleConfirmStep)}
                   EndIcon={Icon.FiArrowRight}
                   data-testid={`continue-button-${currentStep}`}>
                   {steps[currentStep].confirmText}
@@ -547,9 +553,9 @@ export async function getServerSideProps(context: NextPageContext) {
       startTime: true,
       endTime: true,
       username: true,
+      name: true,
       firstName: true,
       lastName: true,
-      DNI: true,
       phoneNumber: true,
       email: true,
       bio: true,
@@ -590,6 +596,18 @@ export async function getServerSideProps(context: NextPageContext) {
         },
         select: {
           id: true,
+        },
+      },
+      patientProfile: {
+        select: {
+          id: true,
+          DNI: true,
+        },
+      },
+      doctorProfile: {
+        select: {
+          id: true,
+          DNI: true,
         },
       },
     },

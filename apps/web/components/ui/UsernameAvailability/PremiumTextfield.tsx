@@ -31,9 +31,7 @@ interface ICustomUsernameProps {
   user: Pick<
     User,
     | "username"
-    | "firstName"
-    | "lastName"
-    | "DNI"
+    | "name"
     | "phoneNumber"
     | "email"
     | "bio"
@@ -175,7 +173,7 @@ const PremiumTextfield = (props: ICustomUsernameProps) => {
   const saveUsername = () => {
     if (usernameChangeCondition === UsernameChangeStatusEnum.NORMAL) {
       updateUsername.mutate({
-        username: inputUsernameValue,
+        username: inputUsernameValue || "",
       });
     }
   };

@@ -31,9 +31,9 @@ async function getUserFromSession({
       id: true,
       role: true,
       username: true,
+      name: true,
       firstName: true,
       lastName: true,
-      DNI: true,
       phoneNumber: true,
       email: true,
       bio: true,
@@ -80,11 +80,13 @@ async function getUserFromSession({
       patientProfile: {
         select: {
           id: true,
+          DNI: true,
         },
       },
       doctorProfile: {
         select: {
           id: true,
+          DNI: true,
         },
       },
     },

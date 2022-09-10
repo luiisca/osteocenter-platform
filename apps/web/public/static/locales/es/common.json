@@ -451,7 +451,7 @@
   "reschedule": "Reprogramar",
   "reschedule_this": "Reprogramar en su lugar",
   "book_a_team_member": "Reservar un miembro del equipo en su lugar",
-  "or": "O",
+  "or": "o",
   "go_back": "Volver",
   "email_or_username": "Email o Nombre de Usuario",
   "send_invite_email": "Enviar Invitación por Email",
@@ -944,10 +944,15 @@
   "additional_notes_workflow": "Notas Adicionales",
   "app_upgrade_description": "Para poder usar esta función, necesita actualizarse a una cuenta Pro.",
   "invalid_number": "Número de teléfono no válido",
-  "email_already_registered_with_different_provider": "Cuenta ya registrada con otro proveedor (Google, Facebook o Enlace Mágico). Por favor reintenta usando el mismo proveedor con el que registraste tu cuenta",
+  "email_already_registered_with_different_provider": "Cuenta ya registrada con otro proveedor (Google, Facebook o Enlace Mágico). Por favor reintenta usando el mismo proveedor con el que registraste tu cuenta. Reinicia tu navegador si el problema persiste.",
   "magic_link": "Enlace Mágico",
   "step": "Paso",
   "of": "de",
+  "min_length_2": "Insertar al menos 2 caracteres",
   "min_length_4": "Insertar al menos 4 caracteres",
-  "min_length_2": "Insertar al menos 2 caracteres"
+  "min_length_5": "Insertar al menos 5 caracteres",
+  "required_length_8": "El campo DNI debe tener 8 caracteres",
+  "required_length_9": "El campo del número de teléfono debe tener 8 caracteres",
+  "not_number": "Debe ser un número",
+  "not_empty": "No puedo estar vacío"
 }

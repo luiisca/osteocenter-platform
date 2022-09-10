@@ -128,13 +128,16 @@ enum UserPermissionRole {
 
 model User {
   id                   Int                     @id @default(autoincrement())
+  /// @zod.custom(imports.username)
   username             String?                 @unique
+  /// @zod.custom(imports.name)
+  name                 String                  @default("Pedro Huerta")
+  /// @zod.custom(imports.firstName)
   firstName            String                  @default("Pedro")
+  /// @zod.custom(imports.lastName)
   lastName             String                  @default("Huerta")
   /// @zod.custom(imports.phoneNumber)
-  phoneNumber          Int?                    @unique
-  /// @zod.custom(imports.DNI)
-  DNI                  Int                     @unique @default(99999999)
+  phoneNumber          String?                 @unique
   /// @zod.email()
   email                String                  @unique
   emailVerified        DateTime?
@@ -601,11 +604,15 @@ enum WorkflowMethods {
 }
 
 model PatientProfile {
-  id   Int   @id @default(autoincrement())
+  id   Int    @id @default(autoincrement())
+  /// @zod.custom(imports.DNI)
+  DNI  String @unique @default("99999999")
   user User?
 }
 
 model DoctorProfile {
-  id   Int   @id @default(autoincrement())
+  id   Int    @id @default(autoincrement())
+  /// @zod.custom(imports.DNI)
+  DNI  String @unique @default("99999999")
   user User?
 }

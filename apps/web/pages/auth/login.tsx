@@ -9,7 +9,7 @@ import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { collectPageParameters, telemetryEventTypes, useTelemetry } from "@calcom/lib/telemetry";
 import { Alert } from "@calcom/ui/Alert";
 import Button from "@calcom/ui/Button";
-import { EmailField, Form } from "@calcom/ui/form/fields";
+import { EmailField } from "@calcom/ui/form/fields";
 
 import { ErrorCode, getSession } from "@lib/auth";
 import { WEBAPP_URL } from "@lib/config/constants";
@@ -110,10 +110,9 @@ export default function Login() {
             <span className="bg-white px-2 text-sm text-gray-500">{t("or")}</span>
           </div>
         </div>
-        <Form
-          form={form}
+        <form
           className="space-y-6"
-          handleSubmit={async (values) => {
+          onSubmit={form.handleSubmit(async (values) => {
             setErrorMessage(null);
             telemetry.event(telemetryEventTypes.login, collectPageParameters());
             console.log("FORM VALUES", values);
@@ -126,7 +125,7 @@ export default function Login() {
             // we're logged in! let's do a hard refresh to the desired url
             else if (!res.error) router.push(res.url || "");
             else setErrorMessage(errorMessages[res.error] || t("something_went_wrong"));
-          }}
+          })}
           data-testid="login-form">
           <EmailField
             id="email"
@@ -134,8 +133,13 @@ export default function Login() {
             defaultValue={router.query.email || ""}
             placeholder="john.doe@example.com"
             required
-            registerValue="email"
+            {...form.register("email")}
           />
+
+          <>{console.log("LOGIN PROCESS ERRORS", errorMessage)}</>
+          {form.formState.errors.email && (
+            <p className="text-red-400 sm:text-sm">{form.formState.errors.email.message}</p>
+          )}
 
           {errorMessage && !oAuthError && <Alert severity="error" title={errorMessage} />}
           <div className="flex space-y-2">
@@ -143,8 +147,8 @@ export default function Login() {
               {t("sign_in")}
             </Button>
           </div>
-        </Form>
-        {oAuthError && <Alert severity="error" title={errorMessage} />}
+        </form>
+        {oAuthError && <Alert className="mt-4" severity="error" title={errorMessage} />}
       </AuthContainer>
       <AddToHomescreen />
     </>

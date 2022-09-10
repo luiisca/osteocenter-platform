@@ -186,7 +186,7 @@ const UsernameTextfield = (props: ICustomUsernameProps) => {
               data-testid="save-username"
               onClick={() => {
                 updateUsername.mutate({
-                  username: inputUsernameValue,
+                  username: inputUsernameValue || "",
                 });
               }}>
               {t("save")}
