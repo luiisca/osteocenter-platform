@@ -4,14 +4,14 @@ import Head from "next/head";
 import { FC, useEffect, useState } from "react";
 import { FormattedNumber, IntlProvider } from "react-intl";
 
-import { LocationOptionsToString } from "@calcom/app-store/locations";
+import { getSuccessPageLocationMessage } from "@calcom/app-store/locations";
 import getStripe from "@calcom/app-store/stripepayment/lib/client";
 import dayjs from "@calcom/dayjs";
 import { sdkActionManager, useIsEmbed } from "@calcom/embed-core/embed-iframe";
 import { WEBSITE_URL } from "@calcom/lib/constants";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import useTheme from "@calcom/lib/hooks/useTheme";
-import { isBrowserLocale24h } from "@calcom/lib/timeFormat";
+import { getIs24hClockFromLocalStorage, isBrowserLocale24h } from "@calcom/lib/timeFormat";
 import { Icon } from "@calcom/ui/Icon";
 
 import type { PaymentPageProps } from "../pages/payment";
@@ -26,7 +26,7 @@ const PaymentPage: FC<PaymentPageProps> = (props) => {
   useEffect(() => {
     let embedIframeWidth = 0;
     setDate(date.tz(localStorage.getItem("timeOption.preferredTimeZone") || dayjs.tz.guess()));
-    setIs24h(!!localStorage.getItem("timeOption.is24hClock"));
+    setIs24h(!!getIs24hClockFromLocalStorage());
     if (isEmbed) {
       requestAnimationFrame(function fixStripeIframe() {
         // HACK: Look for stripe iframe and center position it just above the embed content
@@ -103,7 +103,7 @@ const PaymentPage: FC<PaymentPageProps> = (props) => {
                         <>
                           <div className="font-medium">{t("where")}</div>
                           <div className="col-span-2 mb-6">
-                            {LocationOptionsToString(props.booking.location, t)}
+                            {getSuccessPageLocationMessage(props.booking.location, t)}
                           </div>
                         </>
                       )}

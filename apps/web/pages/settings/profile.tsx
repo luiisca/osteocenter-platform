@@ -3,34 +3,35 @@ import crypto from "crypto";
 import { GetServerSidePropsContext } from "next";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/router";
-import { ComponentProps, FormEvent, RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { ComponentProps, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import TimezoneSelect, { ITimezone } from "react-timezone-select";
 
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import showToast from "@calcom/lib/notification";
+import { setIs24hClockInLocalStorage } from "@calcom/lib/timeFormat";
 import prisma from "@calcom/prisma";
 import { profileData, ProfileDataInputType } from "@calcom/prisma/zod-utils";
 import { TRPCClientErrorLike } from "@calcom/trpc/client";
 import { trpc } from "@calcom/trpc/react";
 import { AppRouter } from "@calcom/trpc/server/routers/_app";
 import { Alert } from "@calcom/ui/Alert";
-import Badge from "@calcom/ui/Badge";
 import Button from "@calcom/ui/Button";
 import ConfirmationDialogContent from "@calcom/ui/ConfirmationDialogContent";
 import { Dialog, DialogTrigger } from "@calcom/ui/Dialog";
 import { Icon } from "@calcom/ui/Icon";
+import { Form, PasswordField } from "@calcom/ui/form/fields";
 
 import { withQuery } from "@lib/QueryCell";
 import { asStringOrNull, asStringOrUndefined } from "@lib/asStringOrNull";
-import { getSession } from "@lib/auth";
+import { ErrorCode, getSession } from "@lib/auth";
 import { nameOfDay } from "@lib/core/i18n/weekday";
 import { inferSSRProps } from "@lib/types/inferSSRProps";
 
 import ImageUploader from "@components/ImageUploader";
 import SettingsShell from "@components/SettingsShell";
+import TwoFactor from "@components/auth/TwoFactor";
 import Avatar from "@components/ui/Avatar";
-import InfoBadge from "@components/ui/InfoBadge";
 import { UsernameAvailability } from "@components/ui/UsernameAvailability";
 import ColorPicker from "@components/ui/colorpicker";
 import Select from "@components/ui/form/Select";
@@ -39,6 +40,8 @@ type Props = inferSSRProps<typeof getServerSideProps>;
 
 function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: string }) {
   const { user } = props;
+  const form = useForm<DeleteAccountValues>();
+
   const { t } = useLocale();
   const router = useRouter();
   const utils = trpc.useContext();
@@ -66,21 +69,29 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
     },
   });
 
-  const deleteAccount = async () => {
-    await fetch("/api/user/me", {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    }).catch((e) => {
-      console.error(`Error Removing user: ${user.id}, email: ${user.email} :`, e);
-    });
+  const onDeleteMeSuccessMutation = async () => {
+    await utils.invalidateQueries(["viewer.me"]);
+    showToast(t("Your account was deleted"), "success");
+
+    setHasDeleteErrors(false); // dismiss any open errors
     if (process.env.NEXT_PUBLIC_WEBAPP_URL === "https://app.cal.com") {
       signOut({ callbackUrl: "/auth/logout?survey=true" });
     } else {
       signOut({ callbackUrl: "/auth/logout" });
     }
   };
+
+  const onDeleteMeErrorMutation = (error: TRPCClientErrorLike<AppRouter>) => {
+    setHasDeleteErrors(true);
+    setDeleteErrorMessage(errorMessages[error.message]);
+  };
+  const deleteMeMutation = trpc.useMutation("viewer.deleteMe", {
+    onSuccess: onDeleteMeSuccessMutation,
+    onError: onDeleteMeErrorMutation,
+    async onSettled() {
+      await utils.invalidateQueries(["viewer.me"]);
+    },
+  });
 
   const localeOptions = useMemo(() => {
     return (router.locales || []).map((locale) => ({
@@ -117,7 +128,19 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
   });
   const [imageSrc, setImageSrc] = useState<string>(user.avatar || "");
   const [hasErrors, setHasErrors] = useState(false);
+  const [hasDeleteErrors, setHasDeleteErrors] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  const errorMessages: { [key: string]: string } = {
+    [ErrorCode.SecondFactorRequired]: t("2fa_enabled_instructions"),
+    [ErrorCode.IncorrectPassword]: `${t("incorrect_password")} ${t("please_try_again")}`,
+    [ErrorCode.UserNotFound]: t("no_account_exists"),
+    [ErrorCode.IncorrectTwoFactorCode]: `${t("incorrect_2fa_code")} ${t("please_try_again")}`,
+    [ErrorCode.InternalServerError]: `${t("something_went_wrong")} ${t("please_try_again_and_contact_us")}`,
+    [ErrorCode.ThirdPartyIdentityProviderEnabled]: t("account_created_with_identity_provider"),
+  };
+
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
   const [brandColor, setBrandColor] = useState(user.brandColor);
   const [darkBrandColor, setDarkBrandColor] = useState(user.darkBrandColor);
 
@@ -145,7 +168,7 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
     // Write time format to localStorage if available
     // Embed isn't applicable to profile pages. So ignore the rule
     // eslint-disable-next-line @calcom/eslint/avoid-web-storage
-    window.localStorage.setItem("timeOption.is24hClock", selectedTimeFormat.value === 12 ? "false" : "true");
+    setIs24hClockInLocalStorage(selectedTimeFormat.value === 24);
 
     mutation.mutate({
       ...data,
@@ -445,7 +468,6 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
                   <ColorPicker defaultValue={user.darkBrandColor} onChange={setDarkBrandColor} />
                 </div>
               </div>
-
               <h3 className="text-md mt-7 font-bold leading-6 text-red-700">{t("danger_zone")}</h3>
               <div>
                 <div className="relative flex items-start">
@@ -468,8 +490,26 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
                           {t("confirm_delete_account")}
                         </Button>
                       }
-                      onConfirm={() => deleteAccount()}>
-                      {t("delete_account_confirmation_message")}
+                      onConfirm={onConfirmButton}>
+                      <p className="mb-7">{t("delete_account_confirmation_message")}</p>
+                      <PasswordField
+                        data-testid="password"
+                        name="password"
+                        id="password"
+                        type="password"
+                        autoComplete="current-password"
+                        required
+                        label="Password"
+                        ref={passwordRef}
+                      />
+
+                      {user.twoFactorEnabled && (
+                        <Form handleSubmit={onConfirm} className="pb-4" form={form}>
+                          <TwoFactor center={false} />
+                        </Form>
+                      )}
+
+                      {hasDeleteErrors && <Alert severity="error" title={deleteErrorMessage} />}
                     </ConfirmationDialogContent>
                   </Dialog>
                 </div>
@@ -492,7 +532,7 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
  * i18n should never be clubbed with other queries, so that it's caching can be managed independently.
  * We intend to not cache i18n query
  **/
-const WithQuery = withQuery(["viewer.public.i18n"], { context: { skipBatch: true } });
+const WithQuery = withQuery(["viewer.public.i18n"], { trpc: { context: { skipBatch: true } } });
 
 export default function Settings(props: Props) {
   const { t } = useLocale();
@@ -534,6 +574,7 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
       brandColor: true,
       darkBrandColor: true,
       metadata: true,
+      twoFactorEnabled: true,
       timeFormat: true,
       allowDynamicBooking: true,
       patientProfile: {
