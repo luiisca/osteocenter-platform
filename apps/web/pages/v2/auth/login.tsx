@@ -1,65 +1,50 @@
-import classNames from "classnames";
 import { GetServerSidePropsContext } from "next";
-import { getCsrfToken, signIn } from "next-auth/react";
-import Link from "next/link";
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/router";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
-import { FaGoogle } from "react-icons/fa";
+import { FaGoogle, FaFacebookF } from "react-icons/fa";
 
 import { getSafeRedirectUrl } from "@calcom/lib/getSafeRedirectUrl";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { collectPageParameters, telemetryEventTypes, useTelemetry } from "@calcom/lib/telemetry";
-import prisma from "@calcom/prisma";
-import { Icon } from "@calcom/ui";
 import { Alert } from "@calcom/ui/Alert";
-import { Button, EmailField, Form, PasswordField } from "@calcom/ui/v2";
-import SAMLLogin from "@calcom/ui/v2/modules/auth/SAMLLogin";
+import { Button, EmailField } from "@calcom/ui/v2";
 
 import { ErrorCode, getSession } from "@lib/auth";
-import { WEBAPP_URL, WEBSITE_URL } from "@lib/config/constants";
-import { hostedCal, isSAMLLoginEnabled, samlProductID, samlTenantID } from "@lib/saml";
-import { inferSSRProps } from "@lib/types/inferSSRProps";
+import { WEBAPP_URL } from "@lib/config/constants";
 
 import AddToHomescreen from "@components/AddToHomescreen";
-import TwoFactor from "@components/auth/TwoFactor";
 import AuthContainer from "@components/v2/ui/AuthContainer";
 
-import { IS_GOOGLE_LOGIN_ENABLED } from "@server/lib/constants";
 import { ssrInit } from "@server/lib/ssr";
 
 interface LoginValues {
   email: string;
-  password: string;
-  totpCode: string;
-  csrfToken: string;
 }
 
-export default function Login({
-  csrfToken,
-  isGoogleLoginEnabled,
-  isSAMLLoginEnabled,
-  hostedCal,
-  samlTenantID,
-  samlProductID,
-}: inferSSRProps<typeof getServerSideProps>) {
+export default function Login() {
   const { t } = useLocale();
   const router = useRouter();
   const form = useForm<LoginValues>();
   const { formState } = form;
   const { isSubmitting } = formState;
 
-  const [twoFactorRequired, setTwoFactorRequired] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [oAuthError, setOAuthError] = useState<boolean>(false);
 
-  const errorMessages: { [key: string]: string } = {
-    // [ErrorCode.SecondFactorRequired]: t("2fa_enabled_instructions"),
-    [ErrorCode.IncorrectPassword]: `${t("incorrect_password")} ${t("please_try_again")}`,
-    [ErrorCode.UserNotFound]: t("no_account_exists"),
-    [ErrorCode.IncorrectTwoFactorCode]: `${t("incorrect_2fa_code")} ${t("please_try_again")}`,
-    [ErrorCode.InternalServerError]: `${t("something_went_wrong")} ${t("please_try_again_and_contact_us")}`,
-    [ErrorCode.ThirdPartyIdentityProviderEnabled]: t("account_created_with_identity_provider"),
-  };
+  const errorMessages: { [key: string]: string } = useMemo(
+    () => ({
+      // [ErrorCode.SecondFactorRequired]: t("2fa_enabled_instructions"),
+      [ErrorCode.IncorrectPassword]: `${t("incorrect_password")} ${t("please_try_again")}`,
+      [ErrorCode.UserNotFound]: t("no_account_exists"),
+      [ErrorCode.IncorrectTwoFactorCode]: `${t("incorrect_2fa_code")} ${t("please_try_again")}`,
+      [ErrorCode.InternalServerError]: `${t("something_went_wrong")} ${t("please_try_again_and_contact_us")}`,
+      [ErrorCode.ThirdPartyIdentityProviderEnabled]: t("account_created_with_identity_provider"),
+      [ErrorCode.IncorrectProvider]: t("email_already_registered_with_different_provider"),
+    }),
+    [t]
+  );
 
   const telemetry = useTelemetry();
 
@@ -76,126 +61,98 @@ export default function Login({
 
   callbackUrl = safeCallbackUrl || "";
 
-  const LoginFooter = (
-    <a href={`${WEBSITE_URL}/signup`} className="text-brand-500 font-medium">
-      {t("dont_have_an_account")}
-    </a>
-  );
+  console.log("LOGIN PAGE CALLBACKURL", router.query?.error);
 
-  const TwoFactorFooter = (
-    <Button
-      onClick={() => {
-        setTwoFactorRequired(false);
-        form.setValue("totpCode", "");
-      }}
-      StartIcon={Icon.FiArrowLeft}
-      color="minimal">
-      {t("go_back")}
-    </Button>
-  );
+  useEffect(() => {
+    if (router.query?.error === "OAuthCallback" || router.query?.error === "OAuthAccountNotLinked") {
+      setOAuthError(true);
+      setErrorMessage(errorMessages[ErrorCode.IncorrectProvider]);
+    } else if (router.query?.error) {
+      setOAuthError(true);
+      setErrorMessage(errorMessages[router.query?.error as string] || t("something_went_wrong"));
+    }
+  }, [errorMessages, router.query?.error, t]);
 
   return (
     <>
-      <AuthContainer
-        title={t("login")}
-        description={t("login")}
-        showLogo
-        heading={twoFactorRequired ? t("2fa_code") : t("welcome_back")}
-        footerText={twoFactorRequired ? TwoFactorFooter : LoginFooter}>
-        <Form
-          form={form}
-          handleSubmit={async (values) => {
-            setErrorMessage(null);
-            telemetry.event(telemetryEventTypes.login, collectPageParameters());
-            const res = await signIn<"credentials">("credentials", {
-              ...values,
-              callbackUrl,
-              redirect: false,
-            });
-            if (!res) setErrorMessage(errorMessages[ErrorCode.InternalServerError]);
-            // we're logged in! let's do a hard refresh to the desired url
-            else if (!res.error) router.push(callbackUrl);
-            // reveal two factor input if required
-            else if (res.error === ErrorCode.SecondFactorRequired) setTwoFactorRequired(true);
-            // fallback if error not found
-            else setErrorMessage(errorMessages[res.error] || t("something_went_wrong"));
-          }}
-          data-testid="login-form">
-          <div>
-            <input
-              defaultValue={csrfToken || undefined}
-              type="hidden"
-              hidden
-              {...form.register("csrfToken")}
-            />
-          </div>
-          <div className="space-y-6">
-            <div className={classNames("space-y-6", { hidden: twoFactorRequired })}>
-              <EmailField
-                id="email"
-                label={t("email_address")}
-                defaultValue={router.query.email as string}
-                placeholder="john.doe@example.com"
-                required
-                {...form.register("email")}
-              />
-              <div className="relative">
-                <div className="absolute right-0 -top-[6px] z-10">
-                  <Link href="/auth/forgot-password">
-                    <a tabIndex={-1} className="text-sm font-medium text-gray-600">
-                      {t("forgot")}
-                    </a>
-                  </Link>
-                </div>
-                <PasswordField
-                  id="password"
-                  autoComplete="current-password"
-                  required
-                  className="mb-0"
-                  {...form.register("password")}
-                />
-              </div>
-            </div>
-
-            {twoFactorRequired && <TwoFactor center />}
-
-            {errorMessage && <Alert severity="error" title={errorMessage} />}
-            <Button type="submit" color="primary" disabled={isSubmitting} className="w-full justify-center">
-              {twoFactorRequired ? t("submit") : t("sign_in")}
+      <AuthContainer title={t("login")} description={t("login")} showLogo heading={t("sign_in_account")}>
+        <>
+          <div className="mt-5">
+            <Button
+              color="secondary"
+              className="flex w-full justify-center"
+              StartIcon={FaGoogle}
+              data-testid="google"
+              onClick={async (e) => {
+                e.preventDefault();
+                // track Google logins. Without personal data/payload
+                telemetry.event(telemetryEventTypes.googleLogin, collectPageParameters());
+                await signIn("google");
+              }}>
+              {t("signin_with_google")}
             </Button>
           </div>
-        </Form>
-        {!twoFactorRequired && (
-          <>
-            {(isGoogleLoginEnabled || isSAMLLoginEnabled) && <hr className="my-8" />}
-            <div className="space-y-3">
-              {isGoogleLoginEnabled && (
-                <Button
-                  color="secondary"
-                  className="w-full justify-center"
-                  data-testid="google"
-                  StartIcon={FaGoogle}
-                  onClick={async (e) => {
-                    e.preventDefault();
-                    // track Google logins. Without personal data/payload
-                    telemetry.event(telemetryEventTypes.googleLogin, collectPageParameters());
-                    await signIn("google");
-                  }}>
-                  {t("signin_with_google")}
-                </Button>
-              )}
-              {isSAMLLoginEnabled && (
-                <SAMLLogin
-                  email={form.getValues("email")}
-                  samlTenantID={samlTenantID}
-                  samlProductID={samlProductID}
-                  hostedCal={hostedCal}
-                  setErrorMessage={setErrorMessage}
-                />
-              )}
-            </div>
-          </>
-        )}
+          <div className="my-5">
+            <Button
+              color="secondary"
+              StartIcon={FaFacebookF}
+              className="flex w-full justify-center"
+              data-testid="facebook"
+              onClick={async (e) => {
+                e.preventDefault();
+                await signIn("facebook");
+              }}>
+              {t("signin_with_facebook")}
+            </Button>
+          </div>
+        </>
+        <div className="relative my-4">
+          <div className="absolute inset-0 flex items-center" aria-hidden="true">
+            <div className="w-full border-t border-gray-300" />
+          </div>
+          <div className="relative flex justify-center">
+            <span className="bg-white px-2 text-sm text-gray-500">{t("or")}</span>
+          </div>
+        </div>
+        <form
+          className="space-y-6"
+          onSubmit={form.handleSubmit(async (values) => {
+            setErrorMessage(null);
+            telemetry.event(telemetryEventTypes.login, collectPageParameters());
+            console.log("FORM VALUES", values);
+            const res = await signIn<"email">("email", {
+              redirect: false,
+              email: values.email,
+            });
+            console.log("EMAIL PROVIDER", res, values);
+            if (!res) setErrorMessage(errorMessages[ErrorCode.InternalServerError]);
+            // we're logged in! let's do a hard refresh to the desired url
+            else if (!res.error) router.push(res.url || "");
+            else setErrorMessage(errorMessages[res.error] || t("something_went_wrong"));
+          })}
+          data-testid="login-form">
+          <EmailField
+            id="email"
+            label={t("magic_link")}
+            defaultValue={router.query.email || ""}
+            placeholder="john.doe@example.com"
+            required
+            {...form.register("email")}
+          />
+
+          <>{console.log("LOGIN PROCESS ERRORS", errorMessage)}</>
+          {form.formState.errors.email && (
+            <p className="text-red-400 sm:text-sm">{form.formState.errors.email.message}</p>
+          )}
+
+          {errorMessage && !oAuthError && <Alert severity="error" title={errorMessage} />}
+          <div className="flex space-y-2">
+            <Button className="flex w-full justify-center" type="submit" disabled={isSubmitting}>
+              {t("sign_in")}
+            </Button>
+          </div>
+        </form>
+        {oAuthError && <Alert className="mt-4" severity="error" title={errorMessage} />}
       </AuthContainer>
       <AddToHomescreen />
     </>
@@ -216,26 +173,9 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
     };
   }
 
-  const userCount = await prisma.user.count();
-  if (userCount === 0) {
-    // Proceed to new onboarding to create first admin user
-    return {
-      redirect: {
-        destination: "/auth/setup",
-        permanent: false,
-      },
-    };
-  }
-
   return {
     props: {
-      csrfToken: await getCsrfToken(context),
       trpcState: ssr.dehydrate(),
-      isGoogleLoginEnabled: IS_GOOGLE_LOGIN_ENABLED,
-      isSAMLLoginEnabled,
-      hostedCal,
-      samlTenantID,
-      samlProductID,
     },
   };
 }

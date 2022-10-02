@@ -38,6 +38,7 @@ import {
 } from "@calcom/lib/sync/SyncServiceManager";
 import prisma, { baseEventTypeSelect, bookingMinimalSelect } from "@calcom/prisma";
 import { profileData } from "@calcom/prisma/zod-utils";
+import { userMetadata } from "@calcom/prisma/zod-utils";
 import { resizeBase64Image } from "@calcom/web/server/lib/resizeBase64Image";
 
 import { TRPCError } from "@trpc/server";
@@ -846,6 +847,7 @@ const loggedInViewerRouter = createProtectedRouter()
     async resolve({ input, ctx }) {
       const { user, prisma } = ctx;
       const data: Prisma.UserUpdateInput = _.omit(input, ["DNI"]);
+      let isPremiumUsername = false;
       if (input?.username) {
         const username = slugify(input?.username);
         // Only validate if we're changing usernames
@@ -886,8 +888,9 @@ const loggedInViewerRouter = createProtectedRouter()
         }
       }
 
+      let updatedUser;
       if (user.role === "USER" && input?.DNI) {
-        await prisma.user.update({
+        updatedUser = await prisma.user.update({
           where: {
             id: user.id,
           },
@@ -904,7 +907,7 @@ const loggedInViewerRouter = createProtectedRouter()
           },
         });
       } else if (user.role === "ADMIN" && input?.DNI) {
-        await prisma.user.update({
+        updatedUser = await prisma.user.update({
           where: {
             id: user.id,
           },
@@ -921,13 +924,16 @@ const loggedInViewerRouter = createProtectedRouter()
           },
         });
       } else {
-        await prisma.user.update({
+        updatedUser = await prisma.user.update({
           where: {
             id: user.id,
           },
           data,
         });
       }
+
+      // Sync Services
+      await syncServicesUpdateWebUser(updatedUser);
 
       // // Notify stripe about the change
       // if (updatedUser && updatedUser.metadata && hasKeyInMetadata(updatedUser, "stripeCustomerId")) {

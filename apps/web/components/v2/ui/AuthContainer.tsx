@@ -1,4 +1,5 @@
 import classNames from "classnames";
+import Image from "next/image";
 import React from "react";
 
 import { LOGO } from "@calcom/lib/constants";
@@ -21,7 +22,7 @@ export default function AuthContainer(props: React.PropsWithChildren<Props>) {
       <HeadSeo title={props.title} description={props.description} />
       {props.showLogo && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img className="mb-auto h-4" src={LOGO} alt="Cal.com Logo" />
+        <img className="mx-auto mb-6 w-[200px]" src={LOGO} alt="Osteocenter Logo" />
       )}
       <div className={classNames(props.showLogo ? "text-center" : "", "sm:mx-auto sm:w-full sm:max-w-md")}>
         {props.heading && <h2 className="font-cal text-center text-3xl text-neutral-900">{props.heading}</h2>}
@@ -31,7 +32,7 @@ export default function AuthContainer(props: React.PropsWithChildren<Props>) {
           <Loader />
         </div>
       )}
-      <div className="mb-auto mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+      <div className="mt-8 mb-auto sm:mx-auto sm:w-full sm:max-w-md">
         <div className="border-1 mx-2 rounded-md border-gray-200 bg-white px-4 py-10 sm:px-10">
           {props.children}
         </div>
