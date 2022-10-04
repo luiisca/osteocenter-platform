@@ -7,7 +7,6 @@ import { useForm } from "react-hook-form";
 import { getSafeRedirectUrl } from "@calcom/lib/getSafeRedirectUrl";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { collectPageParameters, telemetryEventTypes, useTelemetry } from "@calcom/lib/telemetry";
-import prisma from "@calcom/prisma";
 import { Alert } from "@calcom/ui/Alert";
 import Button from "@calcom/ui/Button";
 import { EmailField } from "@calcom/ui/form/fields";
@@ -74,6 +73,84 @@ export default function Login() {
 
   return (
     <>
+      <AuthContainer title={t("login")} description={t("login")} showLogo heading={t("sign_in_account")}>
+        <>
+          <div className="mt-5">
+            <Button
+              color="secondary"
+              className="flex w-full justify-center"
+              StartIcon={FaGoogle}
+              data-testid="google"
+              onClick={async (e) => {
+                e.preventDefault();
+                // track Google logins. Without personal data/payload
+                telemetry.event(telemetryEventTypes.googleLogin, collectPageParameters());
+                await signIn("google");
+              }}>
+              {t("signin_with_google")}
+            </Button>
+          </div>
+          <div className="my-5">
+            <Button
+              color="secondary"
+              className="flex w-full justify-center"
+              data-testid="facebook"
+              onClick={async (e) => {
+                e.preventDefault();
+                await signIn("facebook");
+              }}>
+              {t("signin_with_facebook")}
+            </Button>
+          </div>
+        </>
+        <div className="relative my-4">
+          <div className="absolute inset-0 flex items-center" aria-hidden="true">
+            <div className="w-full border-t border-gray-300" />
+          </div>
+          <div className="relative flex justify-center">
+            <span className="bg-white px-2 text-sm text-gray-500">{t("or")}</span>
+          </div>
+        </div>
+        <form
+          className="space-y-6"
+          onSubmit={form.handleSubmit(async (values) => {
+            setErrorMessage(null);
+            telemetry.event(telemetryEventTypes.login, collectPageParameters());
+            console.log("FORM VALUES", values);
+            const res = await signIn<"email">("email", {
+              redirect: false,
+              email: values.email,
+            });
+            console.log("EMAIL PROVIDER", res, values);
+            if (!res) setErrorMessage(errorMessages[ErrorCode.InternalServerError]);
+            // we're logged in! let's do a hard refresh to the desired url
+            else if (!res.error) router.push(res.url || "");
+            else setErrorMessage(errorMessages[res.error] || t("something_went_wrong"));
+          })}
+          data-testid="login-form">
+          <EmailField
+            id="email"
+            label={t("magic_link")}
+            defaultValue={router.query.email || ""}
+            placeholder="john.doe@example.com"
+            required
+            {...form.register("email")}
+          />
+
+          <>{console.log("LOGIN PROCESS ERRORS", errorMessage)}</>
+          {form.formState.errors.email && (
+            <p className="text-red-400 sm:text-sm">{form.formState.errors.email.message}</p>
+          )}
+
+          {errorMessage && !oAuthError && <Alert severity="error" title={errorMessage} />}
+          <div className="flex space-y-2">
+            <Button className="flex w-full justify-center" type="submit" disabled={isSubmitting}>
+              {t("sign_in")}
+            </Button>
+          </div>
+        </form>
+        {oAuthError && <Alert className="mt-4" severity="error" title={errorMessage} />}
+      </AuthContainer>
       <AddToHomescreen />
     </>
   );

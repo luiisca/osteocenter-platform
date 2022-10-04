@@ -1285,6 +1285,14 @@
   "format": "Format",
   "uppercase_for_letters": "Use uppercase for all letters",
   "replace_whitespaces_underscores": "Replace whitespaces with underscores",
-  "ignore_special_characters": "Ignore special characters in your Additonal Input label. Use only letters and numbers"
+  "ignore_special_characters": "Ignore special characters in your Additonal Input label. Use only letters and numbers",
+  "verify_your_email": "Verify your email",
+  "check_your_inbox": "Check your Inbox",
+  "sent_email_to": "We have sent an email to",
+  "with_link_to_activate": "with a link to activate your account.",
+  "dont_see_email": "Don't see an email? Click the button below to send another email.",
+  "resend_in_seconds": "Resend in {{seconds}} seconds",
+  "send_another_email": "Send another email",
+  "login_using_another_method": "Login using another method"
 }
 

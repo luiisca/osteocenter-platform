@@ -1278,5 +1278,13 @@
   "confirm_password_change_email": "Confirme su contraseña antes de cambiar su dirección de correo electrónico",
   "seats": "asientos",
   "every_app_published": "Las aplicaciones publicadas en la tienda de aplicaciones de Cal.com son de código abierto y se han sometido a pruebas exhaustivas con las reseñas de pares. Sin embargo, Cal.com, Inc. no avala ni certifica estas aplicaciones a menos que Cal.com las haya publicado expresamente. Si encuentra contenido o comportamiento inapropiados, informe de ello.",
-  "report_app": "Denunciar aplicación"
+  "report_app": "Denunciar aplicación",
+  "verify_your_email": "Verifique su correo",
+  "check_your_inbox": "Revise su bandeja de entrada",
+  "sent_email_to": "Hemos enviado un correo a ",
+  "with_link_to_activate": "con un enlace para activar su cuenta.",
+  "dont_see_email": "Correo no recibido? Presione el botón de abajo para enviar un nuevo correo.",
+  "resend_in_seconds": "Reenviar en {{seconds}} segundos",
+  "send_another_email": "Enviar otro correo",
+  "login_using_another_method": "Entre usando otro método"
 }

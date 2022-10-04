@@ -12,7 +12,6 @@ import path from "path";
 import checkLicense from "@calcom/features/ee/common/server/checkLicense";
 import { WEBAPP_URL } from "@calcom/lib/constants";
 import { defaultCookies } from "@calcom/lib/default-cookies";
-import rateLimit from "@calcom/lib/rateLimit";
 import { serverConfig } from "@calcom/lib/serverConfig";
 import prisma from "@calcom/prisma";
 
@@ -76,6 +75,7 @@ if (true) {
     })
   );
 }
+
 const calcomAdapter = CalComAdapter(prisma);
 export const authOptions: NextAuthOptions = {
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment

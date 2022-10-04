@@ -77,6 +77,8 @@ export default function Login() {
     <>
       <AuthContainer title={t("login")} description={t("login")} showLogo heading={t("sign_in_account")}>
         <>
+          {oAuthError && <Alert className="mt-4" severity="error" title={errorMessage} />}
+          {errorMessage && !oAuthError && <Alert severity="error" title={errorMessage} />}
           <div className="mt-5">
             <Button
               color="secondary"
@@ -124,11 +126,11 @@ export default function Login() {
               redirect: false,
               email: values.email,
             });
-            console.log("EMAIL PROVIDER", res, values);
             if (!res) setErrorMessage(errorMessages[ErrorCode.InternalServerError]);
             // we're logged in! let's do a hard refresh to the desired url
-            else if (!res.error) router.push(res.url || "");
-            else setErrorMessage(errorMessages[res.error] || t("something_went_wrong"));
+            else if (!res.error) {
+              router.push(`${res.url}&email=${values.email}` || "");
+            } else setErrorMessage(errorMessages[res.error] || t("something_went_wrong"));
           })}
           data-testid="login-form">
           <EmailField
@@ -140,19 +142,12 @@ export default function Login() {
             {...form.register("email")}
           />
 
-          <>{console.log("LOGIN PROCESS ERRORS", errorMessage)}</>
-          {form.formState.errors.email && (
-            <p className="text-red-400 sm:text-sm">{form.formState.errors.email.message}</p>
-          )}
-
-          {errorMessage && !oAuthError && <Alert severity="error" title={errorMessage} />}
           <div className="flex space-y-2">
             <Button className="flex w-full justify-center" type="submit" disabled={isSubmitting}>
               {t("sign_in")}
             </Button>
           </div>
         </form>
-        {oAuthError && <Alert className="mt-4" severity="error" title={errorMessage} />}
       </AuthContainer>
       <AddToHomescreen />
     </>
