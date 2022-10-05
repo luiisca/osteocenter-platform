@@ -148,15 +148,15 @@ export const successRedirectUrl = z
   ])
   .optional();
 
-export const username = z.string().min(4, { message: "min_length_4" });
+export const username = z.string().min(2, { message: "min_length_2" }).optional();
 export const name = z.string().min(5, { message: "min_length_5" });
 export const firstName = z.string().min(2, { message: "min_length_2" });
 export const lastName = z.string().min(2, { message: "min_length_2" });
 export const phoneNumber = z
   .string()
   .min(1, { message: "not_empty" })
-  .regex(/^\d+$/, { message: "not_number" })
-  .length(9, { message: "required_length_9" })
+  .regex(/^\+\d+$/, { message: "not_phone" })
+  .length(12, { message: "required_length_12" })
   .optional();
 export const DNI = z
   .string()
@@ -165,15 +165,15 @@ export const DNI = z
   .length(8, { message: "required_length_8" });
 
 export const profileData = z.object({
-  username: z.string().min(4, { message: "min_length_4" }),
+  username: z.string().min(2, { message: "min_length_2" }).optional(),
   name: z.string().min(5, { message: "min_length_5" }),
   firstName: z.string().min(2, { message: "min_length_2" }),
   lastName: z.string().min(2, { message: "min_length_2" }),
   phoneNumber: z
     .string()
     .min(1, { message: "not_empty" })
-    .regex(/^\d+$/, { message: "not_number" })
-    .length(9, { message: "required_length_9" })
+    .regex(/^\+\d+$/, { message: "not_phone" })
+    .length(12, { message: "required_length_12" })
     .optional(),
   DNI: z
     .string()

@@ -847,14 +847,12 @@ const loggedInViewerRouter = createProtectedRouter()
     async resolve({ input, ctx }) {
       const { user, prisma } = ctx;
       const data: Prisma.UserUpdateInput = _.omit(input, ["DNI"]);
-      let isPremiumUsername = false;
       if (input?.username) {
         const username = slugify(input?.username);
         // Only validate if we're changing usernames
         if (username !== user.username) {
           data.username = username;
           const response = await checkUsername(username);
-          isPremiumUsername = response.premium;
           if (!response.available) {
             throw new TRPCError({ code: "BAD_REQUEST", message: response.message });
           }
@@ -872,64 +870,68 @@ const loggedInViewerRouter = createProtectedRouter()
       if (!userToUpdate) {
         throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
       }
-      const metadata = userMetadata.parse(userToUpdate.metadata);
-      // Checking the status of payment directly from stripe allows to avoid the situation where the user has got the refund or maybe something else happened asyncly at stripe but our DB thinks it's still paid for
-      // TODO: Test the case where one time payment is refunded.
-      const premiumUsernameCheckoutSessionId = metadata?.checkoutSessionId;
-      if (premiumUsernameCheckoutSessionId) {
-        const checkoutSession = await stripe.checkout.sessions.retrieve(premiumUsernameCheckoutSessionId);
-        const canUserHavePremiumUsername = checkoutSession.payment_status == "paid";
-
-        if (isPremiumUsername && !canUserHavePremiumUsername) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "You need to pay for premium username",
-          });
-        }
-      }
 
       let updatedUser;
-      if (user.role === "USER" && input?.DNI) {
-        updatedUser = await prisma.user.update({
-          where: {
-            id: user.id,
-          },
-          data: {
-            ...data,
-            patientProfile: {
-              connectOrCreate: {
-                where: {
-                  DNI: input?.DNI,
+      try {
+        if (user.role === "USER" && input?.DNI) {
+          updatedUser = await prisma.user.update({
+            where: {
+              id: user.id,
+            },
+            data: {
+              ...data,
+              patientProfile: {
+                connectOrCreate: {
+                  where: {
+                    DNI: input?.DNI,
+                  },
+                  create: { id: user.id },
                 },
-                create: { id: user.id },
               },
             },
-          },
-        });
-      } else if (user.role === "ADMIN" && input?.DNI) {
-        updatedUser = await prisma.user.update({
-          where: {
-            id: user.id,
-          },
-          data: {
-            ...data,
-            doctorProfile: {
-              connectOrCreate: {
-                where: {
-                  DNI: input?.DNI,
+          });
+        } else if (user.role === "ADMIN" && input?.DNI) {
+          updatedUser = await prisma.user.update({
+            where: {
+              id: user.id,
+            },
+            data: {
+              ...data,
+              doctorProfile: {
+                connectOrCreate: {
+                  where: {
+                    DNI: input?.DNI,
+                  },
+                  create: { id: user.id },
                 },
-                create: { id: user.id },
               },
             },
-          },
-        });
-      } else {
-        updatedUser = await prisma.user.update({
-          where: {
-            id: user.id,
-          },
-          data,
-        });
+          });
+        } else {
+          updatedUser = await prisma.user.update({
+            where: {
+              id: user.id,
+            },
+            data,
+          });
+        }
+      } catch (e) {
+        console.error("SOMETHING WENT WRONG UPDATING USER PROFILE", e);
+
+        if (e.code === "P2002") {
+          const errorMessage = {
+            key: "unique_constraint",
+            variables: {
+              field: e.meta.target[0],
+            },
+          };
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: JSON.stringify(errorMessage) as string,
+            cause: e,
+          });
+        }
+        throw e;
       }
 
       // Sync Services

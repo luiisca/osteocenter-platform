@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { getSession } from "@calcom/lib/auth";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
-import { User } from "@calcom/prisma/client";
+import { User, PatientProfile, DoctorProfile } from "@calcom/prisma/client";
 import { Button } from "@calcom/ui/v2";
 
 import prisma from "@lib/prisma";
@@ -19,7 +19,7 @@ import UserProfile from "@components/getting-started/steps-views/UserProfile";
 import { UserSettings } from "@components/getting-started/steps-views/UserSettings";
 
 interface IOnboardingPageProps {
-  user: User;
+  user: User & { patientProfile: PatientProfile; doctorProfile: DoctorProfile };
 }
 
 const INITIAL_STEP = "user-settings";
@@ -33,17 +33,18 @@ const stepTransform = (step: typeof steps[number]) => {
   return INITIAL_STEP;
 };
 
-const stepRouteSchema = z.object({
-  step: z.array(z.enum(steps)).default([INITIAL_STEP]),
-});
-
 const OnboardingPage = (props: IOnboardingPageProps) => {
   const router = useRouter();
 
   const { user } = props;
   const { t } = useLocale();
 
-  const result = stepRouteSchema.safeParse(router.query);
+  const userSteps = ["user-settings", "user-profile"] as const;
+  const result = z
+    .object({
+      step: z.array(z.enum(user.role === "ADMIN" ? steps : userSteps)).default([INITIAL_STEP]),
+    })
+    .safeParse(router.query);
   const currentStep = result.success ? result.data.step[0] : INITIAL_STEP;
 
   const headers = [
@@ -66,7 +67,9 @@ const OnboardingPage = (props: IOnboardingPageProps) => {
     },
     {
       title: `${t("nearly_there")}`,
-      subtitle: [`${t("nearly_there_instructions")}`],
+      subtitle: [
+        `${t(user.role === "ADMIN" ? "nearly_there_instructions" : "nearly_there_instructions_user")}`,
+      ],
     },
   ];
 
@@ -107,7 +110,11 @@ const OnboardingPage = (props: IOnboardingPageProps) => {
                   </p>
                 ))}
               </header>
-              <Steps maxSteps={steps.length} currentStep={currentStepIndex} navigateToStep={goToIndex} />
+              <Steps
+                maxSteps={user.role === "ADMIN" ? steps.length : userSteps.length}
+                currentStep={currentStepIndex}
+                navigateToStep={goToIndex}
+              />
             </div>
             <StepCard>
               {currentStep === "user-settings" && <UserSettings user={user} nextStep={() => goToIndex(1)} />}
@@ -155,8 +162,12 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
     },
     select: {
       id: true,
+      role: true,
       username: true,
       name: true,
+      firstName: true,
+      lastName: true,
+      phoneNumber: true,
       email: true,
       bio: true,
       avatar: true,
@@ -172,6 +183,18 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
       allowDynamicBooking: true,
       defaultScheduleId: true,
       completedOnboarding: true,
+      patientProfile: {
+        select: {
+          id: true,
+          DNI: true,
+        },
+      },
+      doctorProfile: {
+        select: {
+          id: true,
+          DNI: true,
+        },
+      },
     },
   });
 
@@ -181,6 +204,7 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
 
   return {
     props: {
+      session,
       ...(await serverSideTranslations(context.locale ?? "", ["common"])),
       user: {
         ...user,

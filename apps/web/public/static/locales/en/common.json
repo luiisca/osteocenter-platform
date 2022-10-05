@@ -219,8 +219,10 @@
   "check_email_reset_password": "Check your email. We sent you a link to reset your password.",
   "finish": "Finish",
   "few_sentences_about_yourself": "A few sentences about yourself. This will appear on your personal url page.",
+  "few_sentences_about_yourself_user": "A few sentences about yourself.",
   "nearly_there": "Nearly there!",
   "nearly_there_instructions": "Last thing, a brief description about you and a photo really help you get bookings and let people know who they’re booking with.",
+  "nearly_there_instructions_user": "Last thing, a brief description about you and a photo really help your doctor connect and remember you",
   "set_availability_instructions": "Define ranges of time when you are available on a recurring basis. You can create more of these later and assign them to different calendars.",
   "set_availability": "Set your availability",
   "continue_without_calendar": "Continue without calendar",
@@ -1092,8 +1094,8 @@
   "min_length_4": "Insert at least 4 characters",
   "min_length_5": "Insert at least 5 characters",
   "required_length_8": "DNI field must be 8 characters long",
-  "required_length_9": "Phone number field must be 9 characters long",
-  "not_number": "Has to be a number",
+  "required_length_12": "Phone number field must be 12 characters long",
+  "not_phone": "Has to start with a valid country calling code",
   "not_empty": "Can't be empty",
   "rate_limit_exceeded": "Rate limit exceeded",
   "when_something_happens": "When something happens",
@@ -1293,6 +1295,7 @@
   "dont_see_email": "Don't see an email? Click the button below to send another email.",
   "resend_in_seconds": "Resend in {{seconds}} seconds",
   "send_another_email": "Send another email",
-  "login_using_another_method": "Login using another method"
+  "login_using_another_method": "Login using another method",
+  "unique_constraint": "This {{field}} is already taken. Please try a different one"
 }
 

@@ -154,7 +154,7 @@ const UserProfile = (props: IUserProfile) => {
           </p>
         )}
         <p className="mt-2 font-sans text-sm font-normal text-gray-600 dark:text-white">
-          {t("few_sentences_about_yourself")}
+          {t(user?.role === "ADMIN" ? "few_sentences_about_yourself" : "few_sentences_about_yourself_user")}
         </p>
       </fieldset>
       <Button
