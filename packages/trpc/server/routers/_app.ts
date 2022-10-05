@@ -1,6 +1,8 @@
 /**
  * This file contains the root router of your tRPC-backend
  */
+import { Prisma } from "@prisma/client";
+
 import { createRouter } from "../createRouter";
 import { publicProcedure, t } from "../trpc";
 import { publicRouter } from "./public";
@@ -18,7 +20,15 @@ export const legacyRouter = createRouter()
    * Optionally do custom error (type safe!) formatting
    * @link https://trpc.io/docs/error-formatting
    */
-  // .formatError(({ shape, error }) => { })
+  .formatError(({ shape, error }) => {
+    return {
+      ...shape,
+      data: {
+        ...shape.data,
+        ...error,
+      },
+    };
+  })
   .merge("viewer.", viewerRouter)
   .interop();
 

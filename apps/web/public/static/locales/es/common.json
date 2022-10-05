@@ -218,9 +218,11 @@
   "all_apps": "Todas las aplicaciones",
   "check_email_reset_password": "Revisa tu email. Te hemos enviado un enlace para restablecer tu contraseña.",
   "finish": "Terminar",
-  "few_sentences_about_yourself": "Unas pocas frases sobre ti mismo. Esto aparecerá en tu página de url personal.",
-  "nearly_there": "Cerca de Allí",
+  "few_sentences_about_yourself": "Unas pocas frases sobre usted. Esto aparecerá en su página de reservas personal.",
+  "few_sentences_about_yourself_user": "Unas pocas frases sobre usted.",
+  "nearly_there": "Ya casi",
   "nearly_there_instructions": "Por último, una breve descripción de ti y una foto realmente te ayudan a hacer tus reservas y a informar a la gente con quién está reservando.",
+  "nearly_there_instructions_user": "Por último, una breve descripción de usted y una foto realmente ayuda a su doctor a conectar y recordarlo",
   "set_availability_instructions": "Defina los intervalos de tiempo cuando esté disponible de forma recurrente. Puede crear más tarde y asignarlos a diferentes calendarios.",
   "set_availability": "Establecer Disponibilidad",
   "continue_without_calendar": "Continuar sin calendario",
@@ -1072,8 +1074,8 @@
   "min_length_4": "Insertar al menos 4 caracteres",
   "min_length_5": "Insertar al menos 5 caracteres",
   "required_length_8": "El campo DNI debe tener 8 caracteres",
-  "required_length_9": "El campo del número de teléfono debe tener 8 caracteres",
-  "not_number": "Debe ser un número",
+  "required_length_12": "El campo número de teléfono debe tener 12 caracteres",
+  "not_phone": "Debe empezar con un prefijo de llamada válido",
   "not_empty": "No puedo estar vacío",
   "navigate": "Navegar",
   "open": "Abrir",
@@ -1286,5 +1288,6 @@
   "dont_see_email": "Correo no recibido? Presione el botón de abajo para enviar un nuevo correo.",
   "resend_in_seconds": "Reenviar en {{seconds}} segundos",
   "send_another_email": "Enviar otro correo",
-  "login_using_another_method": "Entre usando otro método"
+  "login_using_another_method": "Entre usando otro método",
+  "unique_constraint": "Este {{field}} ya ha sido registrado. Por favor ingrese uno distinto"
 }

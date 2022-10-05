@@ -641,8 +641,6 @@ export async function getServerSideProps(context: NextPageContext) {
     select: {
       id: true,
       role: true,
-      startTime: true,
-      endTime: true,
       username: true,
       name: true,
       firstName: true,
@@ -652,8 +650,6 @@ export async function getServerSideProps(context: NextPageContext) {
       bio: true,
       avatar: true,
       timeZone: true,
-      identityProvider: true,
-      completedOnboarding: true,
       weekStart: true,
       hideBranding: true,
       theme: true,
@@ -706,15 +702,6 @@ export async function getServerSideProps(context: NextPageContext) {
 
   if (!user) {
     throw new Error(`Signed in as ${session.user.id} but cannot be found in db`);
-  }
-
-  if (user.completedOnboarding) {
-    return {
-      redirect: {
-        permanent: false,
-        destination: "/event-types",
-      },
-    };
   }
 
   const integrations = getApps(user.credentials)

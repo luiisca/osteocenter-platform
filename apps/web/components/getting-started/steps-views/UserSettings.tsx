@@ -1,10 +1,13 @@
 import { ArrowRightIcon } from "@heroicons/react/outline";
+import { zodResolver } from "@hookform/resolvers/zod";
+import omit from "lodash/omit";
 import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import dayjs from "@calcom/dayjs";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
-import { User } from "@calcom/prisma/client";
+import { User, PatientProfile, DoctorProfile } from "@calcom/prisma/client";
+import { profileData, ProfileDataInputType } from "@calcom/prisma/zod-utils";
 import { trpc } from "@calcom/trpc/react";
 import TimezoneSelect from "@calcom/ui/form/TimezoneSelect";
 import { Button } from "@calcom/ui/v2";
@@ -12,26 +15,22 @@ import { Button } from "@calcom/ui/v2";
 import { UsernameAvailability } from "@components/ui/UsernameAvailability";
 
 interface IUserSettingsProps {
-  user: User;
+  user: User & { patientProfile: PatientProfile; doctorProfile: DoctorProfile };
   nextStep: () => void;
 }
-
-type FormData = {
-  name: string;
-};
 
 const UserSettings = (props: IUserSettingsProps) => {
   const { user, nextStep } = props;
   const { t } = useLocale();
   const [selectedTimeZone, setSelectedTimeZone] = useState(user.timeZone ?? dayjs.tz.guess());
-  const { register, handleSubmit, formState } = useForm<FormData>({
-    defaultValues: {
-      name: user?.name || undefined,
-    },
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ProfileDataInputType>({
+    resolver: zodResolver(profileData.omit({ name: true })),
     reValidateMode: "onChange",
   });
-  const { errors } = formState;
-  const defaultOptions = { required: true, maxLength: 255 };
 
   const utils = trpc.useContext();
   const onSuccess = async () => {
@@ -41,17 +40,13 @@ const UserSettings = (props: IUserSettingsProps) => {
   const mutation = trpc.useMutation("viewer.updateProfile", {
     onSuccess: onSuccess,
   });
-  const { data: stripeCustomer } = trpc.useQuery(["viewer.stripeCustomer"]);
-  const paymentRequired = stripeCustomer?.isPremium ? !stripeCustomer?.paidForPremium : false;
-  const onSubmit = handleSubmit((data) => {
-    if (paymentRequired) {
-      return;
+  const onSubmit = handleSubmit((formData: ProfileDataInputType) => {
+    if (formData) {
+      const name = `${formData.firstName} ${formData.lastName}`;
+      mutation.mutate({ ...formData, name, timeZone: selectedTimeZone });
     }
-    mutation.mutate({
-      name: data.name,
-      timeZone: selectedTimeZone,
-    });
   });
+
   const [currentUsername, setCurrentUsername] = useState(user.username || undefined);
   const [inputUsernameValue, setInputUsernameValue] = useState(currentUsername);
   const usernameRef = useRef<HTMLInputElement>(null!);
@@ -70,24 +65,85 @@ const UserSettings = (props: IUserSettingsProps) => {
           user={user}
         />
 
-        {/* Full name textfield */}
+        {/* First name textfield */}
         <div className="w-full">
-          <label htmlFor="name" className="mb-2 block text-sm font-medium text-gray-700">
-            {t("full_name")}
+          <label htmlFor="firstName" className="mb-2 block text-sm font-medium text-gray-700">
+            {t("first_name")}
           </label>
           <input
-            {...register("name", defaultOptions)}
-            id="name"
-            name="name"
+            {...register("firstName")}
+            id="firstName"
             type="text"
-            autoComplete="off"
-            autoCorrect="off"
+            autoComplete="given-name"
+            placeholder={t("first_name")}
             className="w-full rounded-md border border-gray-300 text-sm"
           />
-          {errors.name && (
-            <p data-testid="required" className="text-xs italic text-red-500">
-              {t("required")}
+          {errors.firstName && (
+            <p className="text-xs italic text-red-500">{t(errors.firstName.message as string)}</p>
+          )}
+        </div>
+        {/* Last name textfield */}
+        <div className="w-full">
+          <label htmlFor="lastName" className="mb-2 block text-sm font-medium text-gray-700">
+            {t("last_name")}
+          </label>
+          <input
+            {...register("lastName")}
+            id="lastName"
+            type="text"
+            autoComplete="family-name"
+            placeholder={t("last_name")}
+            className="w-full rounded-md border border-gray-300 text-sm"
+          />
+          {errors.lastName && (
+            <p className="text-xs italic text-red-500">{t(errors.lastName.message as string)}</p>
+          )}
+        </div>
+        {/* Phone number textfield */}
+        <label htmlFor="phoneNumber" className="mb-2 block text-sm font-medium text-gray-700">
+          {t("phone_number")}
+        </label>
+        <input
+          {...register("phoneNumber")}
+          id="phoneNumber"
+          type="text"
+          autoComplete="tel"
+          placeholder="+51931109731"
+          className="w-full rounded-md border border-gray-300 text-sm"
+          defaultValue={user.phoneNumber || undefined}
+        />
+        <>{console.log("INPUT ERRORS", errors)}</>
+        {errors.phoneNumber && (
+          <p className="text-xs italic text-red-500">{t(errors.phoneNumber.message as string)}</p>
+        )}
+        {/* DNI textfield */}
+        <div className="w-full">
+          <label htmlFor="DNI" className="mb-2 block text-sm font-medium text-gray-700">
+            DNI
+          </label>
+          <input
+            {...register("DNI")}
+            id="DNI"
+            type="text"
+            placeholder="76097512"
+            className="w-full rounded-md border border-gray-300 text-sm"
+            defaultValue={
+              (user.role === "USER" ? user?.patientProfile?.DNI : user?.doctorProfile?.DNI) || undefined
+            }
+          />
+          {errors.DNI && <p className="text-xs italic text-red-500">{t(errors.DNI.message as string)}</p>}
+          {mutation.error && (
+            <p className="text-xs italic text-red-500">
+              {t(
+                JSON.parse(mutation.error?.message || "{}")?.key,
+                JSON.parse(mutation.error?.message || "{}")?.variables
+              )}
             </p>
+          )}
+          {console.log(
+            "MUTATION ERRORS",
+            JSON.parse(mutation.error?.message || "{}"),
+            typeof mutation.error?.message
           )}
         </div>
         {/* Timezone select field */}
@@ -112,7 +168,7 @@ const UserSettings = (props: IUserSettingsProps) => {
         type="submit"
         className="mt-8 flex w-full flex-row justify-center"
         disabled={mutation.isLoading}>
-        {t("next_step_text")}
+        {t("next_step")}
         <ArrowRightIcon className="ml-2 h-4 w-4 self-center" aria-hidden="true" />
       </Button>
     </form>
