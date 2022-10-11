@@ -16,10 +16,10 @@ const availabilitySchema = z
     dateFrom: stringToDayjs,
     dateTo: stringToDayjs,
     eventTypeId: z.number().optional(),
-    timezone: z.string().optional(),
     username: z.string().optional(),
     userId: z.number().optional(),
     afterEventBuffer: z.number().optional(),
+    withSource: z.boolean().optional(),
   })
   .refine((data) => !!data.username || !!data.userId, "Either username or userId should be filled in.");
 
@@ -78,14 +78,15 @@ export const getCurrentSeats = (eventTypeId: number, dateFrom: Dayjs, dateTo: Da
 
 export type CurrentSeats = Awaited<ReturnType<typeof getCurrentSeats>>;
 
+/** This should be called getUsersWorkingHoursAndBusySlots (...and remaining seats, and final timezone) */
 export async function getUserAvailability(
   query: {
+    withSource?: boolean;
     username?: string;
     userId?: number;
     dateFrom: string;
     dateTo: string;
     eventTypeId?: number;
-    timezone?: string;
     afterEventBuffer?: number;
   },
   initialData?: {
@@ -94,7 +95,7 @@ export async function getUserAvailability(
     currentSeats?: CurrentSeats;
   }
 ) {
-  const { username, userId, dateFrom, dateTo, eventTypeId, timezone, afterEventBuffer } =
+  const { username, userId, dateFrom, dateTo, eventTypeId, afterEventBuffer } =
     availabilitySchema.parse(query);
 
   if (!dateFrom.isValid() || !dateTo.isValid())
@@ -129,11 +130,13 @@ export async function getUserAvailability(
   });
 
   const bufferedBusyTimes = busyTimes.map((a) => ({
+    ...a,
     start: dayjs(a.start).subtract(currentUser.bufferTime, "minute").toISOString(),
     end: dayjs(a.end)
       .add(currentUser.bufferTime + (afterEventBuffer || 0), "minute")
       .toISOString(),
     title: a.title,
+    source: query.withSource ? a.source : undefined,
   }));
 
   const schedule = eventType?.schedule
@@ -144,9 +147,9 @@ export async function getUserAvailability(
         )[0],
       };
 
-  const timeZone = timezone || schedule?.timeZone || eventType?.timeZone || currentUser.timeZone;
   const startGetWorkingHours = performance.now();
 
+  const timeZone = schedule.timeZone || eventType?.timeZone || currentUser.timeZone;
   const workingHours = getWorkingHours(
     { timeZone },
     schedule.availability ||

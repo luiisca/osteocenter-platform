@@ -3,7 +3,6 @@ import Head from "next/head";
 import superjson from "superjson";
 
 import "@calcom/embed-core/src/embed-iframe";
-import LicenseRequired from "@calcom/features/ee/common/components/LicenseRequired";
 import { httpBatchLink } from "@calcom/trpc/client/links/httpBatchLink";
 import { httpLink } from "@calcom/trpc/client/links/httpLink";
 import { loggerLink } from "@calcom/trpc/client/links/loggerLink";
@@ -40,7 +39,7 @@ function MyApp(props: AppProps) {
         <script dangerouslySetInnerHTML={{ __html: `window.CalComPageStatus = '${pageStatus}'` }} />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
       </Head>
-      {getLayout(<Component {...pageProps} err={err} />)}
+      {getLayout(<Component {...pageProps} err={err} />, router)}
     </AppProviders>
   );
 }

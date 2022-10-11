@@ -1,79 +1,55 @@
+import { zodResolver } from "@hookform/resolvers/zod";
 import crypto from "crypto";
 import { GetServerSidePropsContext } from "next";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/router";
-import { ComponentProps, FormEvent, RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { ComponentProps, useEffect, useMemo, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
 import TimezoneSelect, { ITimezone } from "react-timezone-select";
 
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import showToast from "@calcom/lib/notification";
+import { setIs24hClockInLocalStorage } from "@calcom/lib/timeFormat";
 import prisma from "@calcom/prisma";
+import { profileData, ProfileDataInputType } from "@calcom/prisma/zod-utils";
 import { TRPCClientErrorLike } from "@calcom/trpc/client";
 import { trpc } from "@calcom/trpc/react";
 import { AppRouter } from "@calcom/trpc/server/routers/_app";
 import { Alert } from "@calcom/ui/Alert";
-import Badge from "@calcom/ui/Badge";
 import Button from "@calcom/ui/Button";
 import ConfirmationDialogContent from "@calcom/ui/ConfirmationDialogContent";
 import { Dialog, DialogTrigger } from "@calcom/ui/Dialog";
 import { Icon } from "@calcom/ui/Icon";
+import { Form, PasswordField } from "@calcom/ui/form/fields";
 
 import { withQuery } from "@lib/QueryCell";
 import { asStringOrNull, asStringOrUndefined } from "@lib/asStringOrNull";
-import { getSession } from "@lib/auth";
+import { ErrorCode, getSession } from "@lib/auth";
 import { nameOfDay } from "@lib/core/i18n/weekday";
-import { isBrandingHidden } from "@lib/isBrandingHidden";
 import { inferSSRProps } from "@lib/types/inferSSRProps";
 
 import ImageUploader from "@components/ImageUploader";
 import SettingsShell from "@components/SettingsShell";
+import TwoFactor from "@components/auth/TwoFactor";
 import Avatar from "@components/ui/Avatar";
-import InfoBadge from "@components/ui/InfoBadge";
 import { UsernameAvailability } from "@components/ui/UsernameAvailability";
 import ColorPicker from "@components/ui/colorpicker";
 import Select from "@components/ui/form/Select";
 
-import { UpgradeToProDialog } from "../../components/UpgradeToProDialog";
-
 type Props = inferSSRProps<typeof getServerSideProps>;
-
-function HideBrandingInput(props: { hideBrandingRef: RefObject<HTMLInputElement>; user: Props["user"] }) {
-  const { user } = props;
-  const { t } = useLocale();
-  const [modalOpen, setModalOpen] = useState(false);
-
-  return (
-    <>
-      <input
-        id="hide-branding"
-        name="hide-branding"
-        type="checkbox"
-        ref={props.hideBrandingRef}
-        defaultChecked={isBrandingHidden(user)}
-        className="h-4 w-4 rounded-sm border-gray-300 text-neutral-900 focus:ring-neutral-800 disabled:opacity-50"
-        onClick={(e) => {
-          if (!e.currentTarget.checked || user.plan !== "FREE") {
-            return;
-          }
-
-          // prevent checking the input
-          e.preventDefault();
-
-          setModalOpen(true);
-        }}
-      />
-      <UpgradeToProDialog modalOpen={modalOpen} setModalOpen={setModalOpen}>
-        {t("remove_cal_branding_description")}
-      </UpgradeToProDialog>
-    </>
-  );
-}
 
 function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: string }) {
   const { user } = props;
+  const form = useForm<DeleteAccountValues>();
+
   const { t } = useLocale();
   const router = useRouter();
   const utils = trpc.useContext();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isValid },
+  } = useForm<ProfileDataInputType>({ resolver: zodResolver(profileData) });
   const onSuccessMutation = async () => {
     showToast(t("your_user_profile_updated_successfully"), "success");
     setHasErrors(false); // dismiss any open errors
@@ -93,21 +69,29 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
     },
   });
 
-  const deleteAccount = async () => {
-    await fetch("/api/user/me", {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    }).catch((e) => {
-      console.error(`Error Removing user: ${user.id}, email: ${user.email} :`, e);
-    });
+  const onDeleteMeSuccessMutation = async () => {
+    await utils.invalidateQueries(["viewer.me"]);
+    showToast(t("Your account was deleted"), "success");
+
+    setHasDeleteErrors(false); // dismiss any open errors
     if (process.env.NEXT_PUBLIC_WEBAPP_URL === "https://app.cal.com") {
       signOut({ callbackUrl: "/auth/logout?survey=true" });
     } else {
       signOut({ callbackUrl: "/auth/logout" });
     }
   };
+
+  const onDeleteMeErrorMutation = (error: TRPCClientErrorLike<AppRouter>) => {
+    setHasDeleteErrors(true);
+    setDeleteErrorMessage(errorMessages[error.message]);
+  };
+  const deleteMeMutation = trpc.useMutation("viewer.deleteMe", {
+    onSuccess: onDeleteMeSuccessMutation,
+    onError: onDeleteMeErrorMutation,
+    async onSettled() {
+      await utils.invalidateQueries(["viewer.me"]);
+    },
+  });
 
   const localeOptions = useMemo(() => {
     return (router.locales || []).map((locale) => ({
@@ -126,12 +110,7 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
     { value: 24, label: t("24_hour") },
   ];
   const usernameRef = useRef<HTMLInputElement>(null!);
-  const nameRef = useRef<HTMLInputElement>(null!);
-  const emailRef = useRef<HTMLInputElement>(null!);
-  const descriptionRef = useRef<HTMLTextAreaElement>(null!);
   const avatarRef = useRef<HTMLInputElement>(null!);
-  const hideBrandingRef = useRef<HTMLInputElement>(null!);
-  const allowDynamicGroupBookingRef = useRef<HTMLInputElement>(null!);
   const [selectedTheme, setSelectedTheme] = useState<typeof themeOptions[number] | undefined>();
   const [selectedTimeFormat, setSelectedTimeFormat] = useState({
     value: user.timeFormat || 12,
@@ -149,7 +128,19 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
   });
   const [imageSrc, setImageSrc] = useState<string>(user.avatar || "");
   const [hasErrors, setHasErrors] = useState(false);
+  const [hasDeleteErrors, setHasDeleteErrors] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  const errorMessages: { [key: string]: string } = {
+    [ErrorCode.SecondFactorRequired]: t("2fa_enabled_instructions"),
+    [ErrorCode.IncorrectPassword]: `${t("incorrect_password")} ${t("please_try_again")}`,
+    [ErrorCode.UserNotFound]: t("no_account_exists"),
+    [ErrorCode.IncorrectTwoFactorCode]: `${t("incorrect_2fa_code")} ${t("please_try_again")}`,
+    [ErrorCode.InternalServerError]: `${t("something_went_wrong")} ${t("please_try_again_and_contact_us")}`,
+    [ErrorCode.ThirdPartyIdentityProviderEnabled]: t("account_created_with_identity_provider"),
+  };
+
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
   const [brandColor, setBrandColor] = useState(user.brandColor);
   const [darkBrandColor, setDarkBrandColor] = useState(user.darkBrandColor);
 
@@ -161,40 +152,31 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function updateProfileHandler(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function updateProfileHandler(data: ProfileDataInputType) {
+    // event: FormEvent<HTMLFormElement> (fn type)
+    // event.preventDefault();
 
     const enteredUsername = usernameRef.current.value.toLowerCase();
-    const enteredName = nameRef.current.value;
-    const enteredEmail = emailRef.current.value;
-    const enteredDescription = descriptionRef.current.value;
     const enteredAvatar = avatarRef.current.value;
     const enteredBrandColor = brandColor;
     const enteredDarkBrandColor = darkBrandColor;
     const enteredTimeZone = typeof selectedTimeZone === "string" ? selectedTimeZone : selectedTimeZone.value;
     const enteredWeekStartDay = selectedWeekStartDay.value;
-    const enteredHideBranding = hideBrandingRef.current.checked;
-    const enteredAllowDynamicGroupBooking = allowDynamicGroupBookingRef.current.checked;
     const enteredLanguage = selectedLanguage.value;
     const enteredTimeFormat = selectedTimeFormat.value;
 
     // Write time format to localStorage if available
     // Embed isn't applicable to profile pages. So ignore the rule
     // eslint-disable-next-line @calcom/eslint/avoid-web-storage
-    window.localStorage.setItem("timeOption.is24hClock", selectedTimeFormat.value === 12 ? "false" : "true");
-
-    // TODO: Add validation
+    setIs24hClockInLocalStorage(selectedTimeFormat.value === 24);
 
     mutation.mutate({
+      ...data,
       username: enteredUsername,
-      name: enteredName,
-      email: enteredEmail,
-      bio: enteredDescription,
+      name: `${data.firstName} ${data.lastName}`,
       avatar: enteredAvatar,
       timeZone: enteredTimeZone,
       weekStart: asStringOrUndefined(enteredWeekStartDay),
-      hideBranding: enteredHideBranding,
-      allowDynamicBooking: enteredAllowDynamicGroupBooking,
       theme: asStringOrNull(selectedTheme?.value),
       brandColor: enteredBrandColor,
       darkBrandColor: enteredDarkBrandColor,
@@ -223,27 +205,44 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
           </div>
         </div>
       </div>
-      <form className="divide-y divide-gray-200 lg:col-span-9" onSubmit={updateProfileHandler}>
+      <form className="divide-y divide-gray-200 lg:col-span-9" onSubmit={handleSubmit(updateProfileHandler)}>
         {hasErrors && <Alert severity="error" title={errorMessage} />}
         <div className="pb-6 lg:pb-8">
           <div className="flex flex-col lg:flex-row">
             <div className="flex-grow space-y-6">
               <div className="block sm:flex">
                 <div className="w-full">
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                    {t("full_name")}
+                  <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
+                    {t("first_name")}
                   </label>
                   <input
-                    ref={nameRef}
                     type="text"
-                    name="name"
-                    id="name"
+                    id="firstName"
                     autoComplete="given-name"
-                    placeholder={t("your_name")}
-                    required
-                    className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 text-sm focus:border-neutral-800 focus:outline-none focus:ring-neutral-800"
-                    defaultValue={user.name || undefined}
+                    placeholder={t("first_name")}
+                    {...register("firstName")}
+                    className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
+                    defaultValue={user.firstName || undefined}
                   />
+                  {errors.firstName && (
+                    <p className="text-red-400 sm:text-sm">{t(errors.firstName.message as string)}</p>
+                  )}
+
+                  <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
+                    {t("last_name")}
+                  </label>
+                  <input
+                    id="lastName"
+                    type="text"
+                    autoComplete="family-name"
+                    placeholder={t("last_name")}
+                    {...register("lastName")}
+                    className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
+                    defaultValue={user.lastName || undefined}
+                  />
+                  {errors.lastName && (
+                    <p className="text-red-400 sm:text-sm">{t(errors.lastName.message as string)}</p>
+                  )}
                 </div>
               </div>
               <div className="block sm:flex">
@@ -252,11 +251,11 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
                     {t("email")}
                   </label>
                   <input
-                    ref={emailRef}
                     type="email"
-                    name="email"
                     id="email"
+                    autoComplete="email"
                     placeholder={t("your_email")}
+                    {...register("email")}
                     className="mt-1 block w-full rounded-sm border-gray-300 text-sm focus:border-neutral-800 focus:ring-neutral-800"
                     defaultValue={user.email}
                   />
@@ -266,15 +265,52 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
                 </div>
               </div>
 
+              <div className="block sm:flex">
+                <div className="mb-6 w-full sm:w-1/2">
+                  <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
+                    {t("phone_number")}
+                  </label>
+                  <input
+                    {...register("phoneNumber")}
+                    id="phoneNumber"
+                    autoComplete="tel"
+                    placeholder="+51931109731"
+                    className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
+                    defaultValue={user.phoneNumber || undefined}
+                  />
+                  {errors.phoneNumber && (
+                    <p className="text-red-400 sm:text-sm">{t(errors.phoneNumber.message)}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="block sm:flex">
+                <div className="mb-6 w-full sm:w-1/2">
+                  <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
+                    {t("DNI")}
+                  </label>
+                  <input
+                    {...register("DNI")}
+                    id="DNI"
+                    placeholder="76097512"
+                    className="mt-1 block w-full rounded-sm border border-gray-300 px-3 py-2 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm"
+                    defaultValue={
+                      (user.role === "USER" ? user?.patientProfile?.DNI : user?.doctorProfile?.DNI) ||
+                      undefined
+                    }
+                  />
+                  {errors.DNI && <p className="text-red-400 sm:text-sm">{t(errors.DNI.message)}</p>}
+                </div>
+              </div>
+
               <div>
-                <label htmlFor="about" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="bio" className="block text-sm font-medium text-gray-700">
                   {t("about")}
                 </label>
                 <div className="mt-1">
                   <textarea
-                    ref={descriptionRef}
-                    id="about"
-                    name="about"
+                    id="bio"
+                    {...register("bio")}
                     placeholder={t("little_something_about")}
                     rows={3}
                     defaultValue={user.bio || undefined}
@@ -313,7 +349,7 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
                         nativeInputValueSetter?.call(avatarRef.current, newAvatar);
                         const ev2 = new Event("input", { bubbles: true });
                         avatarRef.current.dispatchEvent(ev2);
-                        updateProfileHandler(ev2 as unknown as FormEvent<HTMLFormElement>);
+                        handleSubmit(updateProfileHandler);
                         setImageSrc(newAvatar);
                       }}
                       imageSrc={imageSrc}
@@ -331,7 +367,7 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
                     id="languageSelect"
                     value={selectedLanguage || props.localeProp}
                     onChange={(v) => v && setSelectedLanguage(v)}
-                    className="mt-1 block w-full rounded-sm text-sm  capitalize"
+                    className="mt-1 block w-full rounded-sm text-sm capitalize"
                     options={localeOptions}
                   />
                 </div>
@@ -358,7 +394,7 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
                     id="timeFormatSelect"
                     value={selectedTimeFormat || user.timeFormat}
                     onChange={(v) => v && setSelectedTimeFormat(v)}
-                    className="mt-1 block w-full rounded-sm  text-sm  capitalize"
+                    className="mt-1 block w-full rounded-sm text-sm capitalize"
                     options={timeFormatOptions}
                   />
                 </div>
@@ -383,25 +419,6 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
                       { value: "Saturday", label: nameOfDay(props.localeProp, 6) },
                     ]}
                   />
-                </div>
-              </div>
-              <div className="relative mt-8 flex items-start">
-                <div className="flex h-5 items-center">
-                  <input
-                    id="dynamic-group-booking"
-                    name="dynamic-group-booking"
-                    type="checkbox"
-                    ref={allowDynamicGroupBookingRef}
-                    defaultChecked={props.user.allowDynamicBooking || false}
-                    className="h-4 w-4 rounded-sm border-gray-300 text-neutral-900 "
-                  />
-                </div>
-                <div className="text-sm ltr:ml-3 rtl:mr-3">
-                  <label
-                    htmlFor="dynamic-group-booking"
-                    className="flex items-center font-medium text-gray-700">
-                    {t("allow_dynamic_booking")} <InfoBadge content={t("allow_dynamic_booking_tooltip")} />
-                  </label>
                 </div>
               </div>
               <div>
@@ -451,20 +468,6 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
                   <ColorPicker defaultValue={user.darkBrandColor} onChange={setDarkBrandColor} />
                 </div>
               </div>
-              <div>
-                <div className="relative flex items-start">
-                  <div className="flex h-5 items-center">
-                    <HideBrandingInput user={user} hideBrandingRef={hideBrandingRef} />
-                  </div>
-                  <div className="text-sm ltr:ml-3 rtl:mr-3">
-                    <label htmlFor="hide-branding" className="font-medium text-gray-700">
-                      {t("disable_cal_branding")}{" "}
-                      {user.plan !== "PRO" && <Badge variant="default">PRO</Badge>}
-                    </label>
-                    <p className="text-gray-500">{t("disable_cal_branding_description")}</p>
-                  </div>
-                </div>
-              </div>
               <h3 className="text-md mt-7 font-bold leading-6 text-red-700">{t("danger_zone")}</h3>
               <div>
                 <div className="relative flex items-start">
@@ -487,8 +490,26 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
                           {t("confirm_delete_account")}
                         </Button>
                       }
-                      onConfirm={() => deleteAccount()}>
-                      {t("delete_account_confirmation_message")}
+                      onConfirm={onConfirmButton}>
+                      <p className="mb-7">{t("delete_account_confirmation_message")}</p>
+                      <PasswordField
+                        data-testid="password"
+                        name="password"
+                        id="password"
+                        type="password"
+                        autoComplete="current-password"
+                        required
+                        label="Password"
+                        ref={passwordRef}
+                      />
+
+                      {user.twoFactorEnabled && (
+                        <Form handleSubmit={onConfirm} className="pb-4" form={form}>
+                          <TwoFactor center={false} />
+                        </Form>
+                      )}
+
+                      {hasDeleteErrors && <Alert severity="error" title={deleteErrorMessage} />}
                     </ConfirmationDialogContent>
                   </Dialog>
                 </div>
@@ -497,7 +518,9 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
           </div>
           <hr className="mt-8" />
           <div className="flex justify-end py-4">
-            <Button type="submit">{t("save")}</Button>
+            <Button disabled={!isValid} type="submit">
+              {t("save")}
+            </Button>
           </div>
         </div>
       </form>
@@ -509,7 +532,7 @@ function SettingsView(props: ComponentProps<typeof Settings> & { localeProp: str
  * i18n should never be clubbed with other queries, so that it's caching can be managed independently.
  * We intend to not cache i18n query
  **/
-const WithQuery = withQuery(["viewer.public.i18n"], { context: { skipBatch: true } });
+const WithQuery = withQuery(["viewer.public.i18n"], { trpc: { context: { skipBatch: true } } });
 
 export default function Settings(props: Props) {
   const { t } = useLocale();
@@ -534,8 +557,12 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
     },
     select: {
       id: true,
+      role: true,
       username: true,
       name: true,
+      firstName: true,
+      lastName: true,
+      phoneNumber: true,
       email: true,
       bio: true,
       avatar: true,
@@ -547,8 +574,21 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
       brandColor: true,
       darkBrandColor: true,
       metadata: true,
+      twoFactorEnabled: true,
       timeFormat: true,
       allowDynamicBooking: true,
+      patientProfile: {
+        select: {
+          id: true,
+          DNI: true,
+        },
+      },
+      doctorProfile: {
+        select: {
+          id: true,
+          DNI: true,
+        },
+      },
     },
   });
 

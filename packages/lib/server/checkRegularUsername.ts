@@ -3,7 +3,6 @@ import prisma from "@calcom/prisma";
 
 export async function checkRegularUsername(_username: string) {
   const username = slugify(_username);
-  const premium = !!process.env.NEXT_PUBLIC_IS_E2E && username.length < 5;
 
   const user = await prisma.user.findUnique({
     where: { username },
@@ -11,16 +10,17 @@ export async function checkRegularUsername(_username: string) {
       username: true,
     },
   });
+  console.log("FOUND USER WITH SAME USERNAME", user);
 
   if (user) {
     return {
       available: false as const,
-      premium,
+      premium: true,
       message: "A user exists with that username",
     };
   }
   return {
     available: true as const,
-    premium,
+    premium: true,
   };
 }

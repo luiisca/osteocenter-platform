@@ -6,6 +6,7 @@ import { Context } from "./createContext";
 
 /**
  * Helper function to create a router with context
+ * @deprecated
  */
 export function createRouter() {
   return trpc.router<Context>().middleware(async ({ path, type, next }) => {
@@ -17,8 +18,12 @@ export function createRouter() {
   });
 }
 
+/**
+ * @deprecated
+ */
 export function createProtectedRouter() {
   return createRouter().middleware(({ ctx, next }) => {
+    console.log("INSIDE PROTECTED ROUTER", ctx);
     if (!ctx.user || !ctx.session) {
       throw new trpc.TRPCError({ code: "UNAUTHORIZED" });
     }

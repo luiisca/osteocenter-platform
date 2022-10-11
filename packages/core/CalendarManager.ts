@@ -5,9 +5,7 @@ import cache from "memory-cache";
 
 import { getCalendar } from "@calcom/app-store/_utils/getCalendar";
 import getApps from "@calcom/app-store/utils";
-import { sendBrokenIntegrationEmail } from "@calcom/emails";
 import { getUid } from "@calcom/lib/CalEventParser";
-import { getErrorFromUnknown } from "@calcom/lib/errors";
 import logger from "@calcom/lib/logger";
 import { performance } from "@calcom/lib/server/perfObserver";
 import type { CalendarEvent, EventBusyDate, NewCalendarEventType } from "@calcom/types/Calendar";
@@ -15,15 +13,13 @@ import type { EventResult } from "@calcom/types/EventManager";
 
 const log = logger.getChildLogger({ prefix: ["CalendarManager"] });
 
-export const getCalendarCredentials = (credentials: Array<Credential>, userId: number) => {
+export const getCalendarCredentials = (credentials: Array<Credential>) => {
   const calendarCredentials = getApps(credentials)
     .filter((app) => app.type.endsWith("_calendar"))
     .flatMap((app) => {
       const credentials = app.credentials.flatMap((credential) => {
         const calendar = getCalendar(credential);
-        return app && calendar && app.variant === "calendar"
-          ? [{ integration: app, credential, calendar }]
-          : [];
+        return app.variant === "calendar" ? [{ integration: app, credential, calendar }] : [];
       });
       return credentials.length ? credentials : [];
     });
@@ -38,40 +34,40 @@ export const getConnectedCalendars = async (
   const connectedCalendars = await Promise.all(
     calendarCredentials.map(async (item) => {
       const { calendar, integration, credential } = item;
-
       const credentialId = credential.id;
-      try {
-        const cals = await calendar.listCalendars();
-        const calendars = _(cals)
-          .map((cal) => ({
-            ...cal,
-            readOnly: cal.readOnly || false,
-            primary: cal.primary || null,
-            isSelected: selectedCalendars.some((selected) => selected.externalId === cal.externalId),
-            credentialId,
-          }))
-          .sortBy(["primary"])
-          .value();
-        const primary = calendars.find((item) => item.primary) ?? calendars[0];
-        if (!primary) {
-          throw new Error("No primary calendar found");
-        }
+      if (!calendar) {
         return {
           integration,
           credentialId,
-          primary,
-          calendars,
         };
-      } catch (_error) {
-        const error = getErrorFromUnknown(_error);
+      }
+      const cals = await calendar.listCalendars();
+      const calendars = _(cals)
+        .map((cal) => ({
+          ...cal,
+          readOnly: cal.readOnly || false,
+          primary: cal.primary || null,
+          isSelected: selectedCalendars.some((selected) => selected.externalId === cal.externalId),
+          credentialId,
+        }))
+        .sortBy(["primary"])
+        .value();
+      const primary = calendars.find((item) => item.primary) ?? calendars.find((cal) => cal !== undefined);
+      if (!primary) {
         return {
           integration,
           credentialId,
           error: {
-            message: error.message,
+            message: "No primary calendar found",
           },
         };
       }
+      return {
+        integration,
+        credentialId,
+        primary,
+        calendars,
+      };
     })
   );
 
@@ -94,7 +90,7 @@ const getCachedResults = async (
     /** Filter out nulls */
     if (!c) return [];
     /** We rely on the index so we can match credentials with calendars */
-    const { id, type } = calendarCredentials[i];
+    const { id, type, appId } = calendarCredentials[i];
     /** We just pass the calendars that matched the credential type,
      * TODO: Migrate credential type or appId
      */
@@ -113,7 +109,10 @@ const getCachedResults = async (
     }
     log.debug(`Cache MISS: Calendar Availability for key ${cacheKey}`);
     /** If we don't then we actually fetch external calendars (which can be very slow) */
-    const availability = await c.getAvailability(dateFrom, dateTo, passedSelectedCalendars);
+    const availability = (await c.getAvailability(dateFrom, dateTo, passedSelectedCalendars)).map((a) => ({
+      ...a,
+      source: `${appId}`,
+    }));
     /** We save the availability to a few seconds so recurrent calls are nearly instant */
 
     cache.put(cacheHashedKey, availability, CACHING_TIME);
@@ -142,7 +141,6 @@ export const getBusyCalendarTimes = async (
   } catch (error) {
     log.warn(error);
   }
-
   return results.reduce((acc, availability) => acc.concat(availability), []);
 };
 
@@ -170,8 +168,11 @@ export const createEvent = async (
         if (error?.code === 404) {
           return undefined;
         }
-        await sendBrokenIntegrationEmail(calEvent, "calendar");
         log.error("createEvent failed", error, calEvent);
+        // @TODO: This code will be off till we can investigate an error with it
+        //https://github.com/calcom/cal.com/issues/3949
+        // await sendBrokenIntegrationEmail(calEvent, "calendar");
+        https: log.error("createEvent failed", error, calEvent);
         return undefined;
       })
     : undefined;
@@ -206,7 +207,9 @@ export const updateEvent = async (
             return event;
           })
           .catch(async (e) => {
-            await sendBrokenIntegrationEmail(calEvent, "calendar");
+            // @TODO: This code will be off till we can investigate an error with it
+            // @see https://github.com/calcom/cal.com/issues/3949
+            // await sendBrokenIntegrationEmail(calEvent, "calendar");
             log.error("updateEvent failed", e, calEvent);
             return undefined;
           })

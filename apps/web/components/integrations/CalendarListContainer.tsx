@@ -1,5 +1,5 @@
+import { useMutation } from "@tanstack/react-query";
 import { Fragment } from "react";
-import { useMutation } from "react-query";
 
 import { InstallAppButton } from "@calcom/app-store/components";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
@@ -104,27 +104,29 @@ function CalendarList(props: Props) {
       query={query}
       success={({ data }) => (
         <List>
-          {data.items.map((item) => (
-            <IntegrationListItem
-              name={item.name}
-              slug={item.slug}
-              key={item.title}
-              title={item.title}
-              logo={item.logo}
-              description={item.description}
-              actions={
-                <InstallAppButton
-                  type={item.type}
-                  render={(buttonProps) => (
-                    <Button color="secondary" {...buttonProps}>
-                      {t("connect")}
-                    </Button>
-                  )}
-                  onChanged={() => props.onChanged()}
-                />
-              }
-            />
-          ))}
+          {data.items
+            .filter((item) => item.slug === "google-calendar")
+            .map((item) => (
+              <IntegrationListItem
+                name={item.name}
+                slug={item.slug}
+                key={item.title}
+                title={item.title}
+                logo={item.logo}
+                description={item.description}
+                actions={
+                  <InstallAppButton
+                    type={item.type}
+                    render={(buttonProps) => (
+                      <Button color="secondary" {...buttonProps}>
+                        {t("connect")}
+                      </Button>
+                    )}
+                    onChanged={() => props.onChanged()}
+                  />
+                }
+              />
+            ))}
         </List>
       )}
     />
@@ -185,8 +187,8 @@ function ConnectedCalendarsList(props: Props) {
                 ) : (
                   <Alert
                     severity="warning"
-                    title={t("calendar_error")}
-                    message={item.error?.message}
+                    title={t("something_went_wrong")}
+                    message={t("calendar_error")}
                     actions={
                       <DisconnectIntegration
                         id={item.credentialId}
