@@ -36,6 +36,25 @@ const UserProfile = (props: IUserProfile) => {
   const router = useRouter();
   const createEventType = trpc.useMutation("viewer.eventTypes.create");
 
+  const DEFAULT_EVENT_TYPES = [
+    {
+      title: t("15min_meeting"),
+      slug: "15min",
+      length: 15,
+    },
+    {
+      title: t("30min_meeting"),
+      slug: "30min",
+      length: 30,
+    },
+    {
+      title: t("secret_meeting"),
+      slug: "secret",
+      length: 15,
+      hidden: true,
+    },
+  ];
+
   const mutation = trpc.useMutation("viewer.updateProfile", {
     onSuccess: async (_data, context) => {
       if (context.avatar) {
@@ -79,25 +98,6 @@ const UserProfile = (props: IUserProfile) => {
     });
   }
 
-  const DEFAULT_EVENT_TYPES = [
-    {
-      title: t("15min_meeting"),
-      slug: "15min",
-      length: 15,
-    },
-    {
-      title: t("30min_meeting"),
-      slug: "30min",
-      length: 30,
-    },
-    {
-      title: t("secret_meeting"),
-      slug: "secret",
-      length: 15,
-      hidden: true,
-    },
-  ];
-
   return (
     <form onSubmit={onSubmit}>
       <p className="font-cal text-sm">{t("profile_picture")}</p>
@@ -138,7 +138,7 @@ const UserProfile = (props: IUserProfile) => {
           {t("about")}
         </label>
         <TextArea
-          {...register("bio", { required: true })}
+          {...register("bio")}
           ref={bioRef}
           name="bio"
           id="bio"
@@ -148,11 +148,6 @@ const UserProfile = (props: IUserProfile) => {
             setValue("bio", event.target.value);
           }}
         />
-        {errors.bio && (
-          <p data-testid="required" className="text-xs italic text-red-500">
-            {t("required")}
-          </p>
-        )}
         <p className="mt-2 font-sans text-sm font-normal text-gray-600 dark:text-white">
           {t(user?.role === "ADMIN" ? "few_sentences_about_yourself" : "few_sentences_about_yourself_user")}
         </p>

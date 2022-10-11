@@ -1094,9 +1094,10 @@
   "min_length_4": "Insert at least 4 characters",
   "min_length_5": "Insert at least 5 characters",
   "required_length_8": "DNI field must be 8 characters long",
-  "required_length_12": "Phone number field must be 12 characters long",
+  "required_length_11": "Phone number field must be 11 characters long",
   "not_phone": "Has to start with a valid country calling code",
   "not_empty": "Can't be empty",
+  "not_number": "Has to be a number",
   "rate_limit_exceeded": "Rate limit exceeded",
   "when_something_happens": "When something happens",
   "action_is_performed": "An action is performed",
@@ -1296,6 +1297,7 @@
   "resend_in_seconds": "Resend in {{seconds}} seconds",
   "send_another_email": "Send another email",
   "login_using_another_method": "Login using another method",
-  "unique_constraint": "This {{field}} is already taken. Please try a different one"
+  "unique_constraint": "This {{field}} is already taken. Please try a different one",
+  "type_phone_number": "Type your phone here"
 }
 

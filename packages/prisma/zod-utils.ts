@@ -156,7 +156,6 @@ export const phoneNumber = z
   .string()
   .min(1, { message: "not_empty" })
   .regex(/^\+\d+$/, { message: "not_phone" })
-  .length(12, { message: "required_length_12" })
   .optional();
 export const DNI = z
   .string()
@@ -173,7 +172,6 @@ export const profileData = z.object({
     .string()
     .min(1, { message: "not_empty" })
     .regex(/^\+\d+$/, { message: "not_phone" })
-    .length(12, { message: "required_length_12" })
     .optional(),
   DNI: z
     .string()

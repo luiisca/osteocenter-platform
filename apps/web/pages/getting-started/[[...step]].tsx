@@ -24,14 +24,19 @@ interface IOnboardingPageProps {
 
 const INITIAL_STEP = "user-settings";
 const steps = ["user-settings", "connected-calendar", "setup-availability", "user-profile"] as const;
-
-const stepTransform = (step: typeof steps[number]) => {
-  const stepIndex = steps.indexOf(step);
-  if (stepIndex > -1) {
-    return steps[stepIndex];
-  }
-  return INITIAL_STEP;
+type adminSteps = readonly ["user-settings", "connected-calendar", "setup-availability", "user-profile"];
+type userSteps = readonly ["user-settings", "user-profile"];
+const isAdminArr = (steps: adminSteps | userSteps): steps is adminSteps => {
+  return true;
 };
+
+// const stepTransform = (step: typeof steps[number]) => {
+//   const stepIndex = steps.indexOf(step);
+//   if (stepIndex > -1) {
+//     return steps[stepIndex];
+//   }
+//   return INITIAL_STEP;
+// };
 
 const OnboardingPage = (props: IOnboardingPageProps) => {
   const router = useRouter();
@@ -39,17 +44,18 @@ const OnboardingPage = (props: IOnboardingPageProps) => {
   const { user } = props;
   const { t } = useLocale();
 
-  const userSteps = ["user-settings", "user-profile"] as const;
+  const stepsByProfile: adminSteps | userSteps =
+    user.role === "ADMIN" ? steps : (["user-settings", "user-profile"] as const);
   const result = z
     .object({
-      step: z.array(z.enum(user.role === "ADMIN" ? steps : userSteps)).default([INITIAL_STEP]),
+      step: z.array(z.enum(stepsByProfile)).default([INITIAL_STEP]),
     })
     .safeParse(router.query);
   const currentStep = result.success ? result.data.step[0] : INITIAL_STEP;
 
   const headers = [
     {
-      title: `${t("welcome_to_cal_header")}`,
+      title: `${t("welcome_to_osteocenter")}`,
       subtitle: [`${t("we_just_need_basic_info")}`, `${t("edit_form_later_subtitle")}`],
     },
     {
@@ -72,18 +78,27 @@ const OnboardingPage = (props: IOnboardingPageProps) => {
       ],
     },
   ];
+  const headersByProfile = user.role === "ADMIN" ? headers : [headers[0], headers[headers.length - 1]];
 
   const goToIndex = (index: number) => {
-    const newStep = steps[index];
+    const newStep = stepsByProfile[index] || INITIAL_STEP;
     router.push(
       {
-        pathname: `/getting-started/${stepTransform(newStep)}`,
+        pathname: `/getting-started/${newStep}`,
       },
       undefined
     );
   };
 
-  const currentStepIndex = steps.indexOf(currentStep);
+  const getStepsIndex: () => number = () => {
+    if (isAdminArr(stepsByProfile)) {
+      return stepsByProfile.indexOf(currentStep);
+    } else if (currentStep === "user-settings" || currentStep === "user-profile") {
+      return stepsByProfile.indexOf(currentStep);
+    }
+    return 0;
+  };
+  const currentStepIndex: number = getStepsIndex();
 
   return (
     <div
@@ -91,7 +106,7 @@ const OnboardingPage = (props: IOnboardingPageProps) => {
       data-testid="onboarding"
       key={router.asPath}>
       <Head>
-        <title>Cal.com - {t("getting_started")}</title>
+        <title>Osteocenter - {t("getting_started")}</title>
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
@@ -101,17 +116,17 @@ const OnboardingPage = (props: IOnboardingPageProps) => {
             <div className="mx-auto sm:max-w-[520px]">
               <header>
                 <p className="font-cal mb-3 text-[28px] font-medium leading-7">
-                  {headers[currentStepIndex]?.title || "Undefined title"}
+                  {headersByProfile[currentStepIndex]?.title || "Undefined title"}
                 </p>
 
-                {headers[currentStepIndex]?.subtitle.map((subtitle, index) => (
+                {headersByProfile[currentStepIndex]?.subtitle.map((subtitle, index) => (
                   <p className="font-sans text-sm font-normal text-gray-500" key={index}>
                     {subtitle}
                   </p>
                 ))}
               </header>
               <Steps
-                maxSteps={user.role === "ADMIN" ? steps.length : userSteps.length}
+                maxSteps={stepsByProfile.length}
                 currentStep={currentStepIndex}
                 navigateToStep={goToIndex}
               />
@@ -127,7 +142,7 @@ const OnboardingPage = (props: IOnboardingPageProps) => {
 
               {currentStep === "user-profile" && <UserProfile user={user} />}
             </StepCard>
-            {headers[currentStepIndex]?.skipText && (
+            {headersByProfile[currentStepIndex]?.skipText && (
               <div className="flex w-full flex-row justify-center">
                 <Button
                   color="minimalSecondary"
@@ -137,7 +152,7 @@ const OnboardingPage = (props: IOnboardingPageProps) => {
                     goToIndex(currentStepIndex + 1);
                   }}
                   className="mt-24 cursor-pointer px-4 py-2 font-sans text-sm font-medium">
-                  {headers[currentStepIndex]?.skipText}
+                  {headersByProfile[currentStepIndex]?.skipText}
                 </Button>
               </div>
             )}
@@ -162,6 +177,7 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
     },
     select: {
       id: true,
+      country: true,
       role: true,
       username: true,
       name: true,

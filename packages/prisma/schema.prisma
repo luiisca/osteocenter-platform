@@ -129,6 +129,7 @@ enum UserPermissionRole {
 
 model User {
   id                   Int                     @id @default(autoincrement())
+  country              String                  @default("pe")
   /// @zod.custom(imports.username)
   username             String?                 @unique
   /// @zod.custom(imports.name)
@@ -611,13 +612,13 @@ enum WorkflowMethods {
 model PatientProfile {
   id   Int    @id @default(autoincrement())
   /// @zod.custom(imports.DNI)
-  DNI  String @unique @default("99999999")
+  DNI  String @unique @default(uuid())
   user User?
 }
 
 model DoctorProfile {
   id   Int    @id @default(autoincrement())
   /// @zod.custom(imports.DNI)
-  DNI  String @unique @default("99999999")
+  DNI  String @unique @default(uuid())
   user User?
 }

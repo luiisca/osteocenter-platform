@@ -23,6 +23,7 @@ export function createRouter() {
  */
 export function createProtectedRouter() {
   return createRouter().middleware(({ ctx, next }) => {
+    console.log("INSIDE PROTECTED ROUTER", ctx);
     if (!ctx.user || !ctx.session) {
       throw new trpc.TRPCError({ code: "UNAUTHORIZED" });
     }

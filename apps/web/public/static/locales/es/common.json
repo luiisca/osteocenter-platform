@@ -1074,9 +1074,10 @@
   "min_length_4": "Insertar al menos 4 caracteres",
   "min_length_5": "Insertar al menos 5 caracteres",
   "required_length_8": "El campo DNI debe tener 8 caracteres",
-  "required_length_12": "El campo número de teléfono debe tener 12 caracteres",
+  "required_length_11": "El campo número de teléfono debe tener 11 caracteres",
   "not_phone": "Debe empezar con un prefijo de llamada válido",
   "not_empty": "No puedo estar vacío",
+  "not_number": "Debe ser un número",
   "navigate": "Navegar",
   "open": "Abrir",
   "close": "Cerrar",
@@ -1289,5 +1290,6 @@
   "resend_in_seconds": "Reenviar en {{seconds}} segundos",
   "send_another_email": "Enviar otro correo",
   "login_using_another_method": "Entre usando otro método",
-  "unique_constraint": "Este {{field}} ya ha sido registrado. Por favor ingrese uno distinto"
+  "unique_constraint": "Este {{field}} ya ha sido registrado. Por favor ingrese uno distinto",
+  "type_phone_number": "Escriba su número de teléfono aquí"
 }

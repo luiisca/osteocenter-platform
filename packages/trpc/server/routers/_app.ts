@@ -20,15 +20,15 @@ export const legacyRouter = createRouter()
    * Optionally do custom error (type safe!) formatting
    * @link https://trpc.io/docs/error-formatting
    */
-  .formatError(({ shape, error }) => {
-    return {
-      ...shape,
-      data: {
-        ...shape.data,
-        ...error,
-      },
-    };
-  })
+  // .formatError(({ shape, error }) => {
+  //   return {
+  //     ...shape,
+  //     data: {
+  //       ...shape.data,
+  //       ...error,
+  //     },
+  //   };
+  // })
   .merge("viewer.", viewerRouter)
   .interop();
 

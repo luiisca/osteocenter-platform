@@ -37,8 +37,7 @@ import {
   updateWebUser as syncServicesUpdateWebUser,
 } from "@calcom/lib/sync/SyncServiceManager";
 import prisma, { baseEventTypeSelect, bookingMinimalSelect } from "@calcom/prisma";
-import { profileData } from "@calcom/prisma/zod-utils";
-import { userMetadata } from "@calcom/prisma/zod-utils";
+import { profileData, DNI, userMetadata } from "@calcom/prisma/zod-utils";
 import { resizeBase64Image } from "@calcom/web/server/lib/resizeBase64Image";
 
 import { TRPCError } from "@trpc/server";
@@ -823,6 +822,7 @@ const loggedInViewerRouter = createProtectedRouter()
   })
   .mutation("updateProfile", {
     input: z.object({
+      country: z.string().optional(),
       username: z.string().optional(),
       name: z.string().optional(),
       firstName: z.string().optional(),
@@ -872,67 +872,99 @@ const loggedInViewerRouter = createProtectedRouter()
       }
 
       let updatedUser;
-      try {
-        if (user.role === "USER" && input?.DNI) {
-          updatedUser = await prisma.user.update({
+      console.log("VIEWER FN INPUT", input?.DNI);
+      if (user.role === "USER" && DNI.safeParse(input?.DNI).success) {
+        console.log("BEFORE USER VIEWER", input);
+        updatedUser = await prisma.user.update({
+          where: {
+            id: user.id,
+          },
+          data: {
+            ...data,
+            patientProfile: {
+              connectOrCreate: {
+                where: {
+                  DNI: input?.DNI,
+                },
+                create: { id: user.id, DNI: input?.DNI },
+              },
+            },
+          },
+          select: {
+            patientProfile: true,
+          },
+        });
+        if (updatedUser?.patientProfile?.DNI !== input?.DNI) {
+          await prisma.patientProfile.update({
             where: {
               id: user.id,
             },
             data: {
-              ...data,
-              patientProfile: {
-                connectOrCreate: {
-                  where: {
-                    DNI: input?.DNI,
-                  },
-                  create: { id: user.id },
-                },
-              },
+              DNI: input?.DNI,
             },
           });
-        } else if (user.role === "ADMIN" && input?.DNI) {
-          updatedUser = await prisma.user.update({
+        }
+        console.log("AFTER USER VIEWER", input);
+      } else if (user.role === "ADMIN" && DNI.safeParse(input?.DNI).success) {
+        console.log("BEFORE ADMIN VIEWER", input);
+        updatedUser = await prisma.user.update({
+          where: {
+            id: user.id,
+          },
+          data: {
+            ...data,
+            doctorProfile: {
+              connectOrCreate: {
+                where: {
+                  DNI: input?.DNI,
+                },
+                create: { id: user.id, DNI: input?.DNI },
+              },
+            },
+          },
+        });
+        if (updatedUser?.doctorProfile?.DNI !== input?.DNI) {
+          await prisma.doctorProfile.update({
             where: {
               id: user.id,
             },
             data: {
-              ...data,
-              doctorProfile: {
-                connectOrCreate: {
-                  where: {
-                    DNI: input?.DNI,
-                  },
-                  create: { id: user.id },
-                },
-              },
+              DNI: input?.DNI,
             },
           });
-        } else {
-          updatedUser = await prisma.user.update({
+        }
+        console.log("AFTER ADMIN VIEWER", input);
+      } else {
+        console.log("BEFORE NO DNI VIEWER", input);
+        updatedUser = await prisma.user.update({
+          where: {
+            id: user.id,
+          },
+          data,
+        });
+        if (updatedUser?.patientProfile && input?.DNI) {
+          await prisma.patientProfile.update({
             where: {
               id: user.id,
             },
-            data,
-          });
-        }
-      } catch (e) {
-        console.error("SOMETHING WENT WRONG UPDATING USER PROFILE", e);
-
-        if (e.code === "P2002") {
-          const errorMessage = {
-            key: "unique_constraint",
-            variables: {
-              field: e.meta.target[0],
+            data: {
+              DNI: input?.DNI,
             },
-          };
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: JSON.stringify(errorMessage) as string,
-            cause: e,
           });
         }
-        throw e;
+        if (updatedUser?.doctorProfile && input?.DNI) {
+          await prisma.doctorProfile.update({
+            where: {
+              id: user.id,
+            },
+            data: {
+              DNI: input?.DNI,
+            },
+          });
+        }
+        console.log("AFTER NO DNI VIEWER", input);
       }
+      console.log("EVERYTHING WENT OK ON VIEWR PROFILE UPDATE");
 
       // Sync Services
       await syncServicesUpdateWebUser(updatedUser);
